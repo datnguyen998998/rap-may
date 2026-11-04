@@ -363,6 +363,39 @@ Hết tuần, top 1–2–3 mỗi bảng nhận **+100 / +60 / +40 🍿** và hu
 - **Video được xem nhiều nhất:** số lượt chiếu, tổng số phút người xem (2 người xem 10 phút = 20 phút) và lúc đông người xem nhất.
 - Bấm **Xem dạng bảng** để xem số liệu dạng bảng. Rạp giữ thống kê 60 ngày gần nhất trong `data/db.json`.
 
+## Phần 4f — An ninh: chống tài khoản clone và phá hoại (DDoS)
+
+Rạp có sẵn các lớp bảo vệ sau, **tự chạy, không cần cài gì** (trừ ô "Tôi không phải robot" ở bước 3):
+
+**1. Chống tài khoản clone gian lận vote**
+- Tài khoản mới phải **tạo được 30 phút** và **xem phim đủ 10 phút** mới được vote (cả 👍 hàng chờ lẫn vote bỏ qua). Bấm vote sớm sẽ được báo còn thiếu bao nhiêu phút. Chủ rạp luôn được vote.
+- Vote bỏ qua chỉ tính những người **được vote**, nên clone mới tạo không làm tăng số phiếu cần.
+- Mỗi IP (một nhà / một wifi) tối đa **2 phiếu** cho cùng một video.
+- Mỗi IP tạo tối đa **3 tài khoản mỗi giờ, 5 tài khoản mỗi ngày** (chỉ tính lần tạo thành công).
+
+**2. Chống phá hoại / DDoS nhỏ** (Render đã chặn sẵn tấn công tầng mạng qua Cloudflare, rạp chặn thêm tầng ứng dụng):
+- Mỗi IP tối đa **12 kết nối** cùng lúc và **300 lượt tải mỗi phút**. Vượt nhiều lần → IP đó **tự bị chặn 15 phút**.
+- Gửi tin dồn dập (hơn 40 tin/giây) → bị ngắt kết nối.
+- Gửi ảnh: rạp kiểm tra quyền, 🍿, thời gian chờ và **dung lượng khai báo trước khi nhận dữ liệu**; tệp quá lớn bị từ chối ngay. Tối đa 2 ảnh đang tải cùng lúc mỗi IP.
+- Kết nối cố tình gửi rất chậm để "giữ" server bị ngắt sau 15–30 giây.
+
+**3. Ô "Tôi không phải robot" khi tạo tài khoản (Cloudflare Turnstile, miễn phí) — nên bật khi mở công khai**
+1. Vào https://dash.cloudflare.com → tạo tài khoản miễn phí (không cần thẻ) → menu trái chọn **Turnstile** → **Add widget**.
+2. **Widget name:** `Rạp Mây` · **Hostname:** tên miền của bạn (ví dụ `xemgihay.online`) · **Widget Mode:** Managed → **Create**.
+3. Cloudflare hiện 2 khoá: **Site Key** và **Secret Key**. Vào Render → dịch vụ của bạn → **Environment** → thêm 2 biến:
+   - `TURNSTILE_SITE_KEY` = Site Key
+   - `TURNSTILE_SECRET` = Secret Key (giữ kín, không gửi cho ai)
+4. Bấm **Save Changes**. Rạp tự khởi động lại; trong Logs thấy dòng `🤖 Chống bot khi tạo tài khoản (Turnstile): đã bật` là xong. Form **Tạo tài khoản** sẽ có thêm ô xác minh (thường chỉ cần đợi 1–2 giây là tự hiện dấu ✓).
+
+**4. Trang quản trị → mục 🛡️ An ninh**
+- **IP tạo nhiều tài khoản:** mỗi dòng là một IP đã tạo từ 2 tài khoản trở lên. Có nhãn **đáng ngờ** khi tạo từ 3 tài khoản trong 24 giờ. Bấm "3 tài khoản" để xem từng tài khoản (tạo lúc nào, đã xem bao nhiêu phút) và **Khoá** từng cái, hoặc bấm **Chặn + khoá TK** để chặn IP 1 ngày và khoá hết tài khoản tạo từ IP đó.
+- **Chặn một IP:** nhập IP, chọn thời hạn (1 giờ / 1 ngày / 7 ngày / vĩnh viễn). Mọi kết nối đang mở từ IP đó bị ngắt ngay.
+- **Khoá một tài khoản theo tên đăng nhập:** người đó bị đá ra ngay, không đăng nhập lại được cho tới khi bạn bấm **Mở khoá**.
+- Lưu ý: nhiều người có thể dùng chung một IP (cùng wifi, cùng mạng 4G). Nên chặn **có thời hạn**, và xem kỹ trước khi chặn.
+- Chặn cố định không cần vào trang quản trị: trên Render thêm biến `BLOCK_IPS` = `1.2.3.4,5.6.7.8`.
+
+**5. (Nâng cao) Đặt Cloudflare của riêng bạn phía trước** — khi bị tấn công lớn, chuyển tên miền từ Nhân Hòa sang Cloudflare (gói Free) để dùng tường lửa, giới hạn tốc độ và chế độ "Under Attack". Bật proxy (đám mây cam) **sau khi** Render đã cấp chứng chỉ, và đặt SSL/TLS ở chế độ **Full**. Cần thì hỏi mình hướng dẫn chi tiết.
+
 ## Phần 5 — Tuỳ chỉnh nhanh
 
 | Muốn đổi | Sửa ở đâu |
@@ -379,6 +412,10 @@ Hết tuần, top 1–2–3 mỗi bảng nhận **+100 / +60 / +40 🍿** và hu
 | Số video tối đa mỗi người trong hàng chờ | `server.js` → `MAX_QUEUE_PER_USER` (mặc định 5) |
 | Độ dài tin nhắn chat | `server.js` → `CHAT_MAX` (mặc định 160) |
 | Tỉ lệ vote bỏ qua | `server.js` → `SKIP_PERCENT` (mặc định: phải trên 35%) |
+| Điều kiện vote (chống clone) | Biến môi trường `VOTE_MIN_AGE_MIN` (mặc định 30 phút tuổi), `VOTE_MIN_WATCH_MIN` (mặc định 10 phút xem), `VOTES_PER_IP` (mặc định 2 phiếu / IP / video) |
+| Giới hạn tạo tài khoản | `SIGNUP_PER_IP_HOUR` (mặc định 3), `SIGNUP_PER_IP_DAY` (mặc định 5) |
+| Giới hạn chống phá hoại | `WS_PER_IP` (12 kết nối), `HTTP_PER_MIN` (300 lượt / phút), `WS_MSG_PER_SEC` (40 tin / giây), `AUTO_BAN_MINUTES` (15 phút), `BLOCK_IPS` (IP chặn cố định) |
+| Ô "Tôi không phải robot" | `TURNSTILE_SITE_KEY`, `TURNSTILE_SECRET` (xem Phần 4f) |
 | Loa, đèn rọi, tấm tiêu âm, LED sân khấu | `public/js/decor.js` |
 | Tốc độ đi bộ, vị trí cửa ra vào | `public/js/theater.js` → `WALK_SPEED`, `STAGE_WALK_SPEED`, `DOOR_X`, `BACK_Z` |
 | Phát lại khoảnh khắc hot: dài bao lâu, cần bao nhiêu emoji | `server.js` → `REPLAY_SECONDS`, `REPLAY_MIN_EMOJI` |
@@ -460,6 +497,7 @@ rap-phim/
 ├── lib/moments.js       ← khoảnh khắc hot (emoji theo giây video), chùm emoji bùng nổ
 ├── lib/polls.js         ← câu đoán trong lúc xem
 ├── lib/moderation.js    ← chặn từ ngữ xấu (đọc tu-cam.txt)
+├── lib/guard.js         ← chống phá hoại: giới hạn theo IP, chặn IP, khoá tài khoản
 ├── lib/stats.js         ← thống kê người vào, giờ đông, video xem nhiều
 ├── lib/config.js        ← đọc config.json / biến môi trường
 ├── bot-chat.txt         ← câu chat của bot, mỗi dòng 1 câu
