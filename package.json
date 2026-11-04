@@ -1,0 +1,12 @@
+{
+  "name": "rap-phim-online",
+  "version": "1.0.0",
+  "description": "Rạp chiếu phim 3D online - cả hội cùng xem YouTube, chat, thả emoji, ném bỏng ngô",
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js"
+  },
+  "engines": {
+    "node": ">=18"
+  }
+}

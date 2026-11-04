@@ -1,0 +1,357 @@
+<!doctype html>
+<html lang="vi">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <meta name="robots" content="noindex" />
+  <title>Quản trị · Rạp Mây</title>
+  <link rel="icon" type="image/svg+xml" href="/img/logo.svg" />
+  <style>
+    :root { --bg: #111211; --card: #1a1620; --line: rgba(255,255,255,.1); --text: #f3eef8; --muted: #a99fb8; --accent: #ffcf4d; }
+    * { box-sizing: border-box; }
+    body { margin: 0; background: var(--bg); color: var(--text); font-family: "Segoe UI", system-ui, sans-serif; }
+    main { max-width: 900px; margin: 0 auto; padding: 24px 16px 60px; }
+    h1 { font-size: 24px; margin: 0 0 4px; }
+    p.muted { color: var(--muted); margin: 0 0 18px; font-size: 14px; }
+    .card { background: var(--card); border: 1px solid var(--line); border-radius: 16px; padding: 18px; }
+    input { width: 100%; padding: 12px 14px; border-radius: 10px; border: 1px solid var(--line); background: rgba(255,255,255,.06); color: var(--text); font-size: 15px; }
+    button { border: 0; border-radius: 10px; padding: 10px 14px; font-weight: 700; cursor: pointer; font-size: 14px; }
+    .primary { background: var(--accent); color: #241a00; margin-top: 10px; width: 100%; padding: 12px; }
+    .err { color: #ff8a8a; font-size: 14px; min-height: 1.2em; margin-top: 8px; }
+    .bar { display: flex; justify-content: space-between; align-items: center; gap: 10px; margin-bottom: 12px; flex-wrap: wrap; }
+    .tabs button { background: rgba(255,255,255,.07); color: var(--text); }
+    .tabs button.on { background: var(--accent); color: #241a00; }
+    table { width: 100%; border-collapse: collapse; font-size: 14px; }
+    th, td { text-align: left; padding: 10px 8px; border-bottom: 1px solid var(--line); vertical-align: middle; }
+    th { color: var(--muted); font-weight: 600; font-size: 12px; text-transform: uppercase; }
+    code { background: rgba(255,255,255,.08); padding: 2px 6px; border-radius: 6px; }
+    .ok { background: #2f9e5b; color: #fff; }
+    .no { background: rgba(255,255,255,.1); color: var(--text); }
+    .st-pending { color: var(--accent); } .st-approved { color: #6fdc96; } .st-rejected { color: #ff8a8a; }
+    .empty { color: var(--muted); padding: 20px; text-align: center; }
+    .ev-form { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-bottom: 14px; }
+    .ev-form .full { grid-column: 1 / -1; }
+    .ev-form label { font-size: 12px; color: var(--muted); display: block; margin-bottom: 4px; }
+    select { width: 100%; padding: 12px 14px; border-radius: 10px; border: 1px solid var(--line); background: #241f2b; color: var(--text); font-size: 15px; }
+    .live { color: #ff6b6b; font-weight: 700; }
+    @media (max-width: 600px) { .ev-form { grid-template-columns: 1fr; } }
+    .tiles { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 10px; margin: 6px 0 14px; }
+    .tile { background: rgba(255,255,255,.04); border: 1px solid var(--line); border-radius: 12px; padding: 12px 14px; }
+    .tile b { display: block; font-size: 28px; line-height: 1.1; }
+    .tile span { font-size: 12px; color: var(--muted); }
+    .tip { background: rgba(255, 207, 77, .1); color: var(--accent); padding: 12px 14px; border-radius: 12px; font-size: 14px; margin: 0 0 8px; }
+    .ch-title { font-size: 15px; margin: 18px 0 2px; }
+    .ch-sub { font-size: 12px; color: var(--muted); margin: 0 0 10px; }
+    .chart { position: relative; display: flex; align-items: flex-end; gap: 2px; height: 180px; padding: 0 0 22px; border-bottom: 1px solid var(--line); }
+    .chart .col { flex: 1; height: 100%; display: flex; flex-direction: column; justify-content: flex-end; align-items: center; position: relative; cursor: default; outline: none; }
+    .chart .bar-fill { width: 70%; max-width: 34px; min-height: 2px; border-radius: 4px 4px 0 0; background: #8a7a5a; transition: opacity .15s; }
+    .chart .col.hot .bar-fill { background: var(--accent); }
+    .chart .col:hover .bar-fill, .chart .col:focus .bar-fill { opacity: .8; outline: 2px solid #fff3; }
+    .chart .lab { position: absolute; bottom: -20px; font-size: 11px; color: var(--muted); white-space: nowrap; }
+    .chart .val { font-size: 11px; color: var(--text); margin-bottom: 3px; }
+    .chart.hours .col .lab { font-size: 10px; }
+    .chart-tip { position: fixed; z-index: 50; pointer-events: none; background: #0d0b10; border: 1px solid var(--line); border-radius: 10px; padding: 8px 10px; font-size: 13px; box-shadow: 0 8px 24px rgba(0,0,0,.4); }
+    .tbl { margin-top: 12px; font-size: 13px; color: var(--muted); }
+    .tbl table { margin-top: 8px; }
+    @media (max-width: 640px) { .tiles { grid-template-columns: repeat(2, minmax(0, 1fr)); } .chart.hours .col:nth-child(odd) .lab { display: none; } }
+    .warn { background: rgba(255, 207, 77, .1); color: var(--accent); padding: 12px; border-radius: 12px; margin-bottom: 12px; font-size: 14px; }
+  </style>
+</head>
+<body>
+  <main>
+    <h1><img src="/img/logo.svg" alt="" width="34" height="34" style="vertical-align:-7px;margin-right:8px" />Quản trị Rạp Mây</h1>
+    <p class="muted">Kiểm tra tài khoản ngân hàng: thấy giao dịch có đúng <b>số tiền</b> và <b>nội dung</b> (mã RAPxxxxxx) thì bấm Duyệt. Người ủng hộ được cộng 🍿 ngay (1.000đ = 10 🍿).</p>
+
+    <div id="loginBox" class="card">
+      <label for="pw">Mật khẩu quản trị</label>
+      <input id="pw" type="password" autocomplete="current-password" />
+      <button class="primary" id="loginBtn">Đăng nhập</button>
+      <div class="err" id="loginErr"></div>
+    </div>
+
+    <div id="listBox" class="card" hidden>
+      <div id="warn" class="warn" hidden>Chưa cài tài khoản ngân hàng nhận ủng hộ (bankId, accountNo, accountName). Người xem sẽ chưa thấy mã QR.</div>
+      <div class="bar">
+        <div class="tabs">
+          <button data-f="pending" class="on">Chờ duyệt</button>
+          <button data-f="all">Tất cả</button>
+        </div>
+        <button class="no" id="logout">Thoát</button>
+      </div>
+      <table>
+        <thead><tr><th>Thời gian</th><th>Người xem</th><th>Nội dung CK</th><th>Số tiền</th><th>Trạng thái</th><th></th></tr></thead>
+        <tbody id="rows"></tbody>
+      </table>
+      <div class="err" id="listErr"></div>
+    </div>
+
+    <div id="statsBox" class="card" hidden style="margin-top:18px">
+      <div class="bar"><h2 id="stats" style="margin:0;font-size:20px">📊 Thống kê</h2>
+        <div class="tabs" id="statRange"><button data-days="7">7 ngày</button><button data-days="14" class="on">14 ngày</button><button data-days="30">30 ngày</button></div></div>
+      <div id="statTiles" class="tiles"></div>
+      <p id="statTip" class="tip"></p>
+      <h3 class="ch-title">Số người vào rạp mỗi ngày</h3>
+      <p class="ch-sub">Mỗi người chỉ tính 1 lần trong ngày, dù vào ra nhiều lần.</p>
+      <div id="chDays" class="chart" role="img" aria-label="Biểu đồ số người vào rạp mỗi ngày"></div>
+      <h3 class="ch-title">Trung bình số người online theo giờ (giờ Việt Nam)</h3>
+      <p class="ch-sub">Cột sáng là những giờ đông nhất: nên đặt Đêm phim vào lúc đó.</p>
+      <div id="chHours" class="chart hours" role="img" aria-label="Biểu đồ số người online trung bình theo giờ"></div>
+      <details class="tbl"><summary>Xem dạng bảng</summary><div id="statTables"></div></details>
+      <h3 class="ch-title">Video được xem nhiều nhất</h3>
+      <table><thead><tr><th>#</th><th>Video</th><th>Lượt chiếu</th><th>Phút xem</th><th>Đông nhất</th></tr></thead><tbody id="statVideos"></tbody></table>
+      <div id="chartTip" class="chart-tip" hidden></div>
+    </div>
+
+    <div id="eventBox" class="card" hidden style="margin-top:18px">
+      <h2 style="margin:0 0 4px;font-size:20px">📅 Lịch chiếu "Đêm phim"</h2>
+      <p class="muted">Trong giờ chiếu, mọi người xem phim được nhân 🍿. Người bấm "Nhắc tôi" sẽ được báo trước 10 phút và lúc bắt đầu.</p>
+      <div class="ev-form">
+        <div class="full"><label for="evTitle">Tên buổi chiếu</label><input id="evTitle" maxlength="80" placeholder="VD: Đêm phim kinh dị thứ Bảy" /></div>
+        <div class="full"><label for="evDesc">Mô tả (không bắt buộc)</label><input id="evDesc" maxlength="200" placeholder="VD: Cả rạp cùng xem series Conjuring" /></div>
+        <div><label for="evStart">Bắt đầu (giờ Việt Nam)</label><input id="evStart" type="datetime-local" /></div>
+        <div><label for="evMin">Thời lượng (phút)</label><input id="evMin" type="number" min="15" max="600" value="120" /></div>
+        <div class="full"><label for="evMult">Hệ số 🍿</label>
+          <select id="evMult"><option value="1">x1 (không nhân)</option><option value="1.5">x1.5</option><option value="2" selected>x2</option><option value="3">x3</option></select></div>
+      </div>
+      <button class="primary" id="evCreate" style="margin-top:0">Tạo lịch chiếu</button>
+      <div class="err" id="evErr"></div>
+      <table style="margin-top:12px">
+        <thead><tr><th>Thời gian</th><th>Buổi chiếu</th><th>🍿</th><th>Người hẹn</th><th></th></tr></thead>
+        <tbody id="evRows"></tbody>
+      </table>
+    </div>
+  </main>
+  <script>
+    const $ = (id) => document.getElementById(id);
+    let pw = sessionStorage.getItem('rap.admin') || '';
+    let filter = 'pending';
+    const money = (n) => n.toLocaleString('vi-VN') + 'đ';
+    const STATUS = { pending: 'Chờ duyệt', approved: 'Đã duyệt', rejected: 'Từ chối' };
+
+    async function load() {
+      // Mở file admin.html bằng cách bấm đúp (file://) thì không nói chuyện được với server
+      if (location.protocol === 'file:') {
+        $('loginErr').textContent = 'Bạn đang mở file admin.html trực tiếp trên máy. Hãy mở rạp bằng trình duyệt theo địa chỉ http://localhost:3000/admin.html (server phải đang chạy).';
+        return;
+      }
+      let r, j;
+      try {
+        r = await fetch('/api/admin/support', { headers: { 'X-Admin-Password': encodeURIComponent(pw) }, cache: 'no-store' });
+      } catch (e) {
+        $('loginErr').textContent = 'Không kết nối được tới server. Kiểm tra cửa sổ dòng lệnh: server có đang chạy (node server.js) không?';
+        $('loginBtn').disabled = false; $('loginBtn').textContent = 'Đăng nhập';
+        return;
+      }
+      j = await r.json().catch(() => ({ error: `Server trả về lỗi ${r.status}. Có thể bạn đang chạy bản cũ — tắt server và chạy lại node server.js.` }));
+      $('loginBtn').disabled = false; $('loginBtn').textContent = 'Đăng nhập';
+      if (!j.ok) {
+        sessionStorage.removeItem('rap.admin');
+        $('loginBox').hidden = false; $('listBox').hidden = true; $('eventBox').hidden = true; $('statsBox').hidden = true;
+        $('loginErr').textContent = pw ? (j.error || 'Không đăng nhập được.') : (j.error && !/Sai mật khẩu/.test(j.error) ? j.error : '');
+        return;
+      }
+      sessionStorage.setItem('rap.admin', pw);
+      $('loginBox').hidden = true; $('listBox').hidden = false; $('eventBox').hidden = false; $('statsBox').hidden = false;
+      loadEvents();
+      loadStats();
+      $('warn').hidden = j.supportEnabled;
+      const list = j.requests.filter((x) => filter === 'all' || x.status === 'pending');
+      const tb = $('rows');
+      tb.innerHTML = '';
+      if (!list.length) {
+        const tr = document.createElement('tr');
+        const td = document.createElement('td');
+        td.colSpan = 6; td.className = 'empty';
+        td.textContent = filter === 'pending' ? 'Không có yêu cầu nào đang chờ 🎉' : 'Chưa có yêu cầu nào.';
+        tr.appendChild(td); tb.appendChild(tr);
+      }
+      for (const x of list) {
+        const tr = document.createElement('tr');
+        const cells = [
+          new Date(x.createdAt).toLocaleString('vi-VN'),
+          `${x.displayName} (${x.username})`,
+          null,
+          money(x.amount) + ` → ${x.points} 🍿`,
+          null,
+          null,
+        ];
+        cells.forEach((c, i) => {
+          const td = document.createElement('td');
+          if (i === 2) { const code = document.createElement('code'); code.textContent = x.code; td.appendChild(code); }
+          else if (i === 4) { td.textContent = STATUS[x.status] || x.status; td.className = 'st-' + x.status; }
+          else if (i === 5) {
+            if (x.status === 'pending') {
+              const ok = document.createElement('button'); ok.className = 'ok'; ok.textContent = 'Duyệt';
+              ok.onclick = () => decide(x.id, true, `Duyệt ${money(x.amount)} của ${x.displayName}?`);
+              const no = document.createElement('button'); no.className = 'no'; no.textContent = 'Từ chối'; no.style.marginLeft = '6px';
+              no.onclick = () => decide(x.id, false, `Từ chối yêu cầu ${money(x.amount)} của ${x.displayName}?`);
+              td.append(ok, no);
+            }
+          } else td.textContent = c;
+          tr.appendChild(td);
+        });
+        tb.appendChild(tr);
+      }
+    }
+
+    async function decide(id, approve, question) {
+      if (!confirm(question)) return;
+      const r = await fetch('/api/admin/support/decide', {
+        method: 'POST', headers: { 'Content-Type': 'application/json', 'X-Admin-Password': encodeURIComponent(pw) }, body: JSON.stringify({ id, approve }),
+      });
+      const j = await r.json().catch(() => ({}));
+      $('listErr').textContent = j.ok ? '' : (j.error || 'Có lỗi.');
+      load();
+    }
+
+    // ---- Thống kê ----
+    let statDays = 14;
+    const fmtDay = (k) => { const [, m, d] = k.split('-'); return `${Number(d)}/${Number(m)}`; };
+    const el = (tag, cls, text) => { const e = document.createElement(tag); if (cls) e.className = cls; if (text != null) e.textContent = text; return e; };
+    function showTip(e, html) {
+      const t = $('chartTip'); t.hidden = false; t.textContent = html;
+      const r = e.currentTarget.getBoundingClientRect();
+      t.style.left = Math.min(window.innerWidth - 180, r.left + r.width / 2 - 60) + 'px';
+      t.style.top = (r.top - 44) + 'px';
+    }
+    const hideTip = () => { $('chartTip').hidden = true; };
+    // biểu đồ cột một chuỗi số liệu: chỉ ghi số trên cột cao nhất và cột cuối, còn lại rê chuột để xem
+    function bars(box, items, { label, value, tip, hot }) {
+      box.innerHTML = '';
+      const max = Math.max(1, ...items.map(value));
+      const iMax = items.findIndex((x) => value(x) === max);
+      items.forEach((it, i) => {
+        const v = value(it);
+        const col = el('div', 'col' + (hot && hot(it) ? ' hot' : ''));
+        col.tabIndex = 0;
+        if ((i === iMax && v > 0) || (i === items.length - 1 && v > 0)) col.appendChild(el('span', 'val', String(v)));
+        const f = el('div', 'bar-fill');
+        f.style.height = (v ? Math.max(2, (v / max) * 150) : 2) + 'px';
+        col.appendChild(f);
+        col.appendChild(el('span', 'lab', label(it, i)));
+        col.onmouseenter = col.onfocus = (e) => showTip(e, tip(it));
+        col.onmouseleave = col.onblur = hideTip;
+        box.appendChild(col);
+      });
+    }
+    async function loadStats() {
+      const r = await fetch('/api/admin/stats?days=' + statDays, { headers: { 'X-Admin-Password': encodeURIComponent(pw) }, cache: 'no-store' }).catch(() => null);
+      const j = r ? await r.json().catch(() => ({})) : {};
+      if (!j.ok) return;
+      const tiles = $('statTiles'); tiles.innerHTML = '';
+      const sumVisitors = j.days.reduce((a, d) => a + d.visitors, 0);
+      for (const [v, t] of [[j.onlineNow, 'đang online lúc này'], [j.today.visitors, 'người vào hôm nay'], [j.today.peak, 'đông nhất hôm nay (cùng lúc)'], [j.accounts, 'tài khoản đã tạo']]) {
+        const d = el('div', 'tile'); d.append(el('b', '', String(v)), el('span', '', t)); tiles.appendChild(d);
+      }
+      const best = j.bestHours || [];
+      $('statTip').textContent = best.length
+        ? `💡 Giờ đông nhất ${statDays} ngày qua: ${best.map((h) => h + 'h').join(', ')}. Nên đặt Đêm phim lúc ${best[0]}h (hoặc sớm hơn 30 phút để mọi người kịp vào).`
+        : '💡 Chưa đủ dữ liệu theo giờ — rạp ghi lại số người online mỗi 5 phút, chờ vài ngày sẽ thấy giờ đông nhất.';
+      bars($('chDays'), j.days, {
+        label: (d, i) => (j.days.length > 14 && i % 3 ? '' : fmtDay(d.day)),
+        value: (d) => d.visitors,
+        tip: (d) => `${fmtDay(d.day)}: ${d.visitors} người · ${d.joins} lượt vào · đông nhất ${d.peak} người cùng lúc`,
+      });
+      bars($('chHours'), j.hours, {
+        label: (h) => h.hour + 'h',
+        value: (h) => h.avg || 0,
+        hot: (h) => best.includes(h.hour),
+        tip: (h) => h.avg == null ? `${h.hour}h–${h.hour + 1}h: chưa có dữ liệu` : `${h.hour}h–${h.hour + 1}h: trung bình ${h.avg} người online`,
+      });
+      // bảng số liệu (cho người không xem được biểu đồ)
+      const tb = $('statTables'); tb.innerHTML = '';
+      const t1 = el('table'); t1.innerHTML = '<thead><tr><th>Ngày</th><th>Người vào</th><th>Lượt vào</th><th>Đông nhất</th></tr></thead>';
+      const b1 = el('tbody'); j.days.forEach((d) => { const tr = el('tr'); [fmtDay(d.day), d.visitors, d.joins, d.peak].forEach((x) => tr.appendChild(el('td', '', String(x)))); b1.appendChild(tr); }); t1.appendChild(b1);
+      const t2 = el('table'); t2.innerHTML = '<thead><tr><th>Giờ</th><th>Trung bình online</th></tr></thead>';
+      const b2 = el('tbody'); j.hours.forEach((h) => { const tr = el('tr'); [h.hour + 'h', h.avg ?? '—'].forEach((x) => tr.appendChild(el('td', '', String(x)))); b2.appendChild(tr); }); t2.appendChild(b2);
+      tb.append(t1, t2);
+      const tv = $('statVideos'); tv.innerHTML = '';
+      if (!j.videos.length) { const tr = el('tr'); const td = el('td', 'empty', 'Chưa có video nào được chiếu.'); td.colSpan = 5; tr.appendChild(td); tv.appendChild(tr); }
+      j.videos.forEach((v, i) => {
+        const tr = el('tr');
+        tr.appendChild(el('td', '', String(i + 1)));
+        const td = el('td'); const a = el('a', '', v.title || v.videoId); a.href = 'https://youtu.be/' + v.videoId; a.target = '_blank'; a.rel = 'noopener'; a.style.color = 'var(--text)'; td.appendChild(a); tr.appendChild(td);
+        [v.plays, v.minutes, v.peakViewers + ' người'].forEach((x) => tr.appendChild(el('td', '', String(x))));
+        tv.appendChild(tr);
+      });
+    }
+    document.querySelectorAll('#statRange button').forEach((b) => { b.onclick = () => { statDays = Number(b.dataset.days); document.querySelectorAll('#statRange button').forEach((x) => x.classList.toggle('on', x === b)); loadStats(); }; });
+
+    // ---- Lịch chiếu ----
+    function renderEvents(list) {
+      const tb = $('evRows');
+      tb.innerHTML = '';
+      if (!list.length) {
+        const tr = document.createElement('tr'); const td = document.createElement('td');
+        td.colSpan = 5; td.className = 'empty'; td.textContent = 'Chưa có lịch chiếu nào.';
+        tr.appendChild(td); tb.appendChild(tr); return;
+      }
+      for (const e of list) {
+        const tr = document.createElement('tr');
+        const live = e.startsAt <= Date.now();
+        const t = document.createElement('td');
+        const v = new Date(e.startsAt + 7 * 3600000).toISOString();
+        t.textContent = `${v.slice(11, 16)} ngày ${v.slice(8, 10)}/${v.slice(5, 7)} · ${Math.round((e.endsAt - e.startsAt) / 60000)} phút`;
+        if (live) { const s = document.createElement('div'); s.className = 'live'; s.textContent = '● Đang diễn ra'; t.appendChild(s); }
+        const n = document.createElement('td'); n.textContent = e.title;
+        if (e.desc) { const d = document.createElement('div'); d.style.color = 'var(--muted)'; d.style.fontSize = '12px'; d.textContent = e.desc; n.appendChild(d); }
+        const m = document.createElement('td'); m.textContent = 'x' + e.multiplier;
+        const c = document.createElement('td'); c.textContent = e.subscribers ?? '—';
+        const a = document.createElement('td');
+        const del = document.createElement('button'); del.className = 'no'; del.textContent = 'Xoá';
+        del.onclick = async () => {
+          if (!confirm(`Xoá lịch chiếu "${e.title}"?`)) return;
+          await postEvent('/api/admin/events/delete', { id: e.id });
+        };
+        a.appendChild(del);
+        tr.append(t, n, m, c, a);
+        tb.appendChild(tr);
+      }
+    }
+    async function loadEvents() {
+      const r = await fetch('/api/admin/events', { headers: { 'X-Admin-Password': encodeURIComponent(pw) } });
+      const j = await r.json().catch(() => ({}));
+      if (j.ok) renderEvents(j.events);
+    }
+    async function postEvent(url, body) {
+      const r = await fetch(url, { method: 'POST', headers: { 'Content-Type': 'application/json', 'X-Admin-Password': encodeURIComponent(pw) }, body: JSON.stringify(body) });
+      const j = await r.json().catch(() => ({}));
+      $('evErr').textContent = j.ok ? '' : (j.error || 'Có lỗi.');
+      if (j.ok) renderEvents(j.events);
+      return j.ok;
+    }
+    // ô thời gian được hiểu theo giờ Việt Nam (UTC+7), dù máy quản trị đặt múi giờ nào
+    function vnInputToMs(v) {
+      const m = /^(\d{4})-(\d{2})-(\d{2})T(\d{2}):(\d{2})$/.exec(v || '');
+      if (!m) return NaN;
+      return Date.UTC(+m[1], m[2] - 1, +m[3], +m[4], +m[5]) - 7 * 3600000;
+    }
+    (function defaultStart() {
+      const d = new Date(Date.now() + 7 * 3600000);
+      d.setUTCDate(d.getUTCDate() + (d.getUTCHours() >= 20 ? 1 : 0));
+      $('evStart').value = d.toISOString().slice(0, 10) + 'T20:00';
+    })();
+    $('evCreate').onclick = async () => {
+      const ok = await postEvent('/api/admin/events/create', {
+        title: $('evTitle').value, desc: $('evDesc').value, startsAt: vnInputToMs($('evStart').value),
+        minutes: Number($('evMin').value), multiplier: Number($('evMult').value),
+      });
+      if (ok) { $('evTitle').value = ''; $('evDesc').value = ''; }
+    };
+
+    function tryLogin() {
+      pw = $('pw').value.trim();
+      if (!pw) { $('loginErr').textContent = 'Bạn chưa nhập mật khẩu.'; return; }
+      $('loginErr').textContent = '';
+      $('loginBtn').disabled = true; $('loginBtn').textContent = 'Đang kiểm tra…';
+      load();
+    }
+    $('loginBtn').onclick = tryLogin;
+    $('pw').addEventListener('keydown', (e) => { if (e.key === 'Enter') tryLogin(); });
+    $('logout').onclick = () => { pw = ''; sessionStorage.removeItem('rap.admin'); load(); };
+    document.querySelectorAll('#listBox .tabs button').forEach((b) => { b.onclick = () => { filter = b.dataset.f; document.querySelectorAll('#listBox .tabs button').forEach((x) => x.classList.toggle('on', x === b)); load(); }; });
+    load(); // mở trang là kiểm tra luôn: báo ngay nếu chưa đặt mật khẩu / server không chạy
+    setInterval(() => { if (pw && !$('listBox').hidden) load(); }, 15000);
+  </script>
+</body>
+</html>

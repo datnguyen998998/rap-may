@@ -1,0 +1,575 @@
+<!doctype html>
+<html lang="vi">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, viewport-fit=cover" />
+  <title>Rạp Mây · Xem phim cùng nhau</title>
+  <meta name="description" content="Rạp Mây: rạp chiếu phim 3D online, xem YouTube cùng bạn bè, chat, lên sân khấu quẩy." />
+  <meta property="og:title" content="Rạp Mây · Xem phim cùng nhau" />
+  <meta property="og:description" content="Rạp chiếu phim 3D online, 100 ghế, xem YouTube cùng hội bạn." />
+  <meta property="og:image" content="/img/rap-may-fb.png" />
+  <meta name="theme-color" content="#111211" />
+  <link rel="icon" type="image/svg+xml" href="/img/logo.svg" />
+  <link rel="apple-touch-icon" href="/img/logo-180.png" />
+  <meta name="theme-color" content="#140c0c" />
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" />
+  <link rel="stylesheet" href="style.css" />
+  <script type="importmap">
+    {
+      "imports": {
+        "three": "https://cdn.jsdelivr.net/npm/three@0.170.0/build/three.module.js",
+        "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.170.0/examples/jsm/"
+      }
+    }
+  </script>
+</head>
+<body>
+  <!-- Rạp 3D -->
+  <div id="stage"></div>
+
+  <!-- Nội dung màn chiếu (được đặt vào không gian 3D) -->
+  <div id="screen">
+    <div id="ytMount"></div>
+    <div id="screenIdle">
+      <div class="idle-inner">
+        <div class="idle-logo">🎬</div>
+        <div class="idle-title">Chưa có phim nào đang chiếu</div>
+        <div class="idle-sub">Dán link YouTube ở khung "Hàng chờ" để đề xuất phim nhé! 🍿</div>
+      </div>
+    </div>
+    <div id="screenVote" class="hidden">
+      <div class="vote-eyebrow">CHỌN VIDEO TIẾP THEO</div>
+      <div class="vote-count"><span id="voteSeconds">15</span><small>giây</small></div>
+      <ol id="voteList"></ol>
+      <div class="vote-hint">Bấm 👍 ở khung hàng chờ để bình chọn</div>
+    </div>
+    <div id="screenPost" class="hidden">
+      <img id="screenPostImg" alt="" />
+      <div class="post-caption">
+        <div id="screenPostText"></div>
+        <div id="screenPostBy"></div>
+      </div>
+      <div class="post-timer"><i id="screenPostBar"></i></div>
+    </div>
+  </div>
+
+  <!-- Giao diện trong rạp -->
+  <div id="hud" class="hidden">
+    <header id="topbar">
+      <div class="top-left">
+        <div class="brand"><img src="/img/logo.svg" alt="" width="28" height="28" /><span>Rạp Mây</span></div>
+        <div id="seatChip" class="chip">💺 –</div>
+        <button id="roomChip" class="chip room-chip hidden" title="Đang ở phòng riêng — bấm để xem các phòng"></button>
+      </div>
+      <div class="top-right">
+        <div id="viewers" class="chip">👥 0/100</div>
+        <button id="missionBtn" class="chip top-act" title="Điểm danh, nhiệm vụ hằng ngày, lịch chiếu, mời bạn"><svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="10"/><circle cx="12" cy="12" r="6"/><circle cx="12" cy="12" r="2"/></svg><span>Nhiệm vụ</span><b id="engageBadge" class="badge hidden">0</b></button>
+        <button id="leaderBtn" class="chip top-act" title="Bảng xếp hạng tuần"><svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 9H4.5a2.5 2.5 0 0 1 0-5H6"/><path d="M18 9h1.5a2.5 2.5 0 0 0 0-5H18"/><path d="M4 22h16"/><path d="M10 14.66V17c0 .55-.47.98-.97 1.21C7.85 18.75 7 20.24 7 22"/><path d="M14 14.66V17c0 .55.47.98.97 1.21C16.15 18.75 17 20.24 17 22"/><path d="M18 2H6v7a6 6 0 0 0 12 0V2Z"/></svg><span>Xếp hạng</span></button>
+        <button id="pointsChip" class="chip" title="🍿 còn dùng được — bấm để xem hạng và tủ đồ">🍿 0</button>
+        <button id="fsBtnTop" class="round-btn mobile-only" title="Toàn màn hình" aria-label="Toàn màn hình"><svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M8 3H5a2 2 0 0 0-2 2v3m18 0V5a2 2 0 0 0-2-2h-3m0 18h3a2 2 0 0 0 2-2v-3M3 16v3a2 2 0 0 0 2 2h3"/></svg></button>
+        <button id="focusBtnTop" class="round-btn mobile-only" title="Ẩn giao diện, chỉ giữ Trò chuyện" aria-label="Ẩn giao diện"><svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M10.7 5.1A10.7 10.7 0 0 1 12 5c7 0 10 7 10 7a13.2 13.2 0 0 1-1.7 2.7"/><path d="M14.1 14.2a3 3 0 0 1-4.2-4.2"/><path d="M17.5 17.5A10.7 10.7 0 0 1 12 19c-7 0-10-7-10-7a13.2 13.2 0 0 1 4.5-5.5"/><path d="m2 2 20 20"/></svg></button>
+        <div class="menu-wrap">
+          <button id="settingsBtn" class="round-btn" title="Tuỳ chọn rạp" aria-label="Tuỳ chọn rạp"><svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><line x1="21" x2="14" y1="4" y2="4"/><line x1="10" x2="3" y1="4" y2="4"/><line x1="21" x2="12" y1="12" y2="12"/><line x1="8" x2="3" y1="12" y2="12"/><line x1="21" x2="16" y1="20" y2="20"/><line x1="12" x2="3" y1="20" y2="20"/><line x1="14" x2="14" y1="2" y2="6"/><line x1="8" x2="8" y1="10" y2="14"/><line x1="16" x2="16" y1="18" y2="22"/></svg></button>
+          <div id="settingsMenu" class="popover drop hidden">
+            <button id="optQuality">✨ Độ nét: Cao</button>
+            <button id="optFullscreen">⛶ Toàn màn hình</button>
+            <button id="optDim">💡 Tắt đèn khi chiếu phim: Bật</button>
+            <button id="optAutoFade">🌙 Tự làm mờ nút khi xem: Bật</button>
+            <button id="optInvite">🔗 Mời bạn bè (sao chép link mời)</button>
+            <button id="optLogout">🚪 Đăng xuất</button>
+          </div>
+        </div>
+        <button id="profileBtn" title="Tủ đồ, đổi tên và ngoại hình">?</button>
+      </div>
+    </header>
+
+    <!-- Đang chiếu (góc trái) -->
+    <section id="npPanel" class="hud-now-playing" aria-live="polite">
+      <button id="eventBanner" class="event-banner hidden" title="Xem lịch chiếu"></button>
+      <span id="npEyebrow" class="eyebrow">RẠP MÂY · XEM PHIM CÙNG NHAU</span>
+      <h1 id="npTitle">Chọn một chỗ, xem cùng nhau.</h1>
+      <p id="npSub">Ghế đơn, ghế đôi, ghế ba — chỗ của bạn ở đâu?</p>
+      <div id="heatWrap" class="heat-wrap hidden" title="Khoảnh khắc hot: đoạn nào cả rạp thả nhiều cảm xúc nhất">
+        <canvas id="heatmap" width="300" height="34" aria-hidden="true"></canvas>
+        <div id="heatPeaks" class="heat-peaks"></div>
+      </div>
+      <div id="npBar" class="hidden"><i></i></div>
+      <button id="changeTrackBtn" class="change-track-button hidden" title="Bạn là người gửi video này"><svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><polygon points="5 4 15 12 5 20 5 4"/><line x1="19" x2="19" y1="5" y2="19"/></svg> Chuyển bài tiếp theo</button>
+      <div id="skipPoll" class="skip-poll hidden" aria-label="Bình chọn bỏ qua video">
+        <button id="skipBtn" class="skip-vote-button" aria-pressed="false"><svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><polygon points="5 4 15 12 5 20 5 4"/><line x1="19" x2="19" y1="5" y2="19"/></svg><span id="skipLabel">Vote bỏ qua</span><b id="skipCount">0/1</b></button>
+        <span id="skipStatus" class="skip-vote-status" role="status"></span>
+        <progress id="skipProgress" value="0" max="1" aria-label="Tiến độ vote bỏ qua"></progress>
+      </div>
+      <button id="pollNewBtn" class="poll-new hidden" title="Ra câu đoán cho cả rạp">🔮 Ra câu đoán</button>
+      <div id="pollCard" class="poll-card hidden" aria-live="polite">
+        <div class="poll-head"><span id="pollTag" class="poll-tag">🔮 ĐOÁN NHANH</span><span id="pollTime" class="poll-time"></span></div>
+        <div id="pollQ" class="poll-q"></div>
+        <div id="pollOpts" class="poll-opts"></div>
+        <div id="pollFoot" class="poll-foot"></div>
+        <div id="pollAdmin" class="poll-admin hidden"></div>
+      </div>
+      <div id="discoTag" class="hud-party hidden"><svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 14a1 1 0 0 1-.78-1.63l9.9-10.2a.5.5 0 0 1 .86.46l-1.92 6.02A1 1 0 0 0 13 10h7a1 1 0 0 1 .78 1.63l-9.9 10.2a.5.5 0 0 1-.86-.46l1.92-6.02A1 1 0 0 0 11 14z"/></svg><span>Disco · 128 BPM</span></div>
+    </section>
+
+    <!-- Thanh menu bên phải -->
+    <nav id="dock" aria-label="Chức năng trong rạp">
+      <button id="dockToggle" class="dock-collapse" aria-expanded="true" title="Thu gọn các nút"><svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m18 15-6-6-6 6"/></svg><b id="dockBadge" class="badge hidden"></b></button>
+      <div class="dock-items">
+        <button data-act="seats" title="Chọn chỗ ngồi"><svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M20 9V6a2 2 0 0 0-2-2H6a2 2 0 0 0-2 2v3"/><path d="M2 16a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2v-5a2 2 0 0 0-4 0v1.5a.5.5 0 0 1-.5.5h-11a.5.5 0 0 1-.5-.5V11a2 2 0 0 0-4 0z"/><path d="M4 18v2"/><path d="M20 18v2"/><path d="M12 4v9"/></svg><span id="dockSeatLabel">Chọn ghế</span></button>
+        <button data-act="video" title="Gửi video YouTube vào hàng chờ"><svg viewBox="0 0 24 24" width="21" height="21" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 12h14"/><path d="M12 5v14"/></svg><span>Gửi video</span></button>
+        <button data-act="post" title="Chiếu ảnh kèm lời nhắn lên màn hình"><svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M16 5h6"/><path d="M19 2v6"/><path d="M21 11.5V19a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h7.5"/><path d="m21 15-3.086-3.086a2 2 0 0 0-2.828 0L6 21"/><circle cx="9" cy="9" r="2"/></svg><span>Chiếu ảnh</span></button>
+        <button data-act="queue" title="Danh sách video chờ chiếu"><svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 12H3"/><path d="M16 6H3"/><path d="M12 18H3"/><path d="m16 12 5 3-5 3v-6Z"/></svg><span>Hàng chờ</span><b id="queueBadge" class="badge lime hidden">0</b></button>
+        <button data-act="chat" title="Trò chuyện"><svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M7.9 20A9 9 0 1 0 4 16.1L2 22Z"/></svg><span>Trò chuyện</span><b id="unread" class="badge hidden">0</b></button>
+        <button data-act="friends" title="Bạn bè, ai đang online, tặng quà"><svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M22 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg><span>Bạn bè</span><b id="friendBadge" class="badge hidden">0</b></button>
+        <button data-act="wardrobe" title="Tủ đồ, đổi tên và ngoại hình"><svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M20.38 3.46 16 2a4 4 0 0 1-8 0L3.62 3.46a2 2 0 0 0-1.34 2.23l.58 3.47a1 1 0 0 0 .99.84H6v10c0 1.1.9 2 2 2h8a2 2 0 0 0 2-2V10h2.15a1 1 0 0 0 .99-.84l.58-3.47a2 2 0 0 0-1.34-2.23z"/></svg><span>Tủ đồ</span></button>
+        <button data-act="host" class="host-only hidden" title="Bảng điều khiển của chủ rạp"><svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M20 13c0 5-3.5 7.5-7.66 8.95a1 1 0 0 1-.67-.01C7.5 20.5 4 18 4 13V6a1 1 0 0 1 1-1c2 0 4.5-1.2 6.24-2.72a1.17 1.17 0 0 1 1.52 0C14.51 3.81 17 5 19 5a1 1 0 0 1 1 1z"/><path d="m9 12 2 2 4-4"/></svg><span>Quản lý</span></button>
+        <button data-act="support" class="donate" title="Ủng hộ rạp"><svg viewBox="0 0 24 24" width="19" height="19" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M19 14c1.49-1.46 3-3.21 3-5.5A5.5 5.5 0 0 0 16.5 3c-1.76 0-3 .5-4.5 2-1.5-1.5-2.74-2-4.5-2A5.5 5.5 0 0 0 2 8.5c0 2.3 1.5 4.05 3 5.5l7 7Z"/></svg><span>Ủng hộ</span></button>
+      </div>
+    </nav>
+
+    <!-- Ngăn trượt: Hàng chờ / Trò chuyện -->
+    <aside id="drawer" class="hidden" aria-label="Bảng bên">
+      <div class="drawer-head">
+        <div><span id="drawerEyebrow" class="eyebrow"></span><h2 id="drawerTitle"></h2></div>
+        <button id="drawerClose" class="x" aria-label="Đóng bảng"><svg viewBox="0 0 24 24" width="19" height="19" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M18 6 6 18"/><path d="m6 6 12 12"/></svg></button>
+      </div>
+      <section id="queueView">
+        <p class="drawer-desc">Xếp theo bình chọn 👍. Video được <b>⚡ chen</b> sẽ lên trước các video khác.</p>
+        <div id="voteBanner" class="hidden">🗳️ Đang bình chọn video tiếp theo · còn <b id="voteBannerSec">15</b> giây</div>
+        <div id="queueList"></div>
+        <div id="queueEmpty" class="empty-queue">
+          <div class="empty-icon"><svg viewBox="0 0 24 24" width="27" height="27" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 12H3"/><path d="M16 6H3"/><path d="M12 18H3"/><path d="m16 12 5 3-5 3v-6Z"/></svg></div>
+          <h3>Hàng chờ đang trống.</h3>
+          <p>Mang một video bạn thích<br />lên màn ảnh của cả hội.</p>
+        </div>
+        <button id="queueAdd" class="primary"><svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 12h14"/><path d="M12 5v14"/></svg> Thêm video YouTube</button>
+      </section>
+      <section id="friendsView">
+        <div class="tabs" id="frTabs">
+          <button data-tab="list" class="on">Bạn bè <b id="frOnline"></b></button>
+          <button data-tab="requests">Lời mời <b id="frReqCount"></b></button>
+          <button data-tab="room">Trong phòng</button>
+        </div>
+        <div id="frList" class="fr-list"></div>
+        <form id="frAddForm" class="fr-add">
+          <input id="frAddInput" maxlength="20" placeholder="Kết bạn bằng tên đăng nhập" autocomplete="off" aria-label="Tên đăng nhập của bạn bè" />
+          <button type="submit" class="primary small">Gửi lời mời</button>
+        </form>
+        <p class="hint fr-hint">⭐ Đánh dấu <b>bạn thân</b> để được báo ngay khi họ vào rạp.</p>
+      </section>
+      <section id="hostView">
+        <div class="host-block">
+          <h3>🎬 Video</h3>
+          <p id="hostNow" class="host-now">Chưa có video nào đang chiếu.</p>
+          <button id="hostSkip" class="host-btn">⏭ Chuyển bài ngay</button>
+          <p class="hint">Xoá video bất kỳ: mở <b>Hàng chờ</b>, video nào cũng có nút 🗑.</p>
+        </div>
+        <div class="host-block">
+          <h3>💬 Chat</h3>
+          <button id="hostLock" class="host-btn">🔒 Tạm khoá chat cả phòng</button>
+          <form id="hostPinForm" class="host-pin">
+            <input id="hostPinIn" maxlength="160" placeholder="Tin nhắn ghim lên đầu khung chat" autocomplete="off" />
+            <button type="submit" class="primary small">📌 Ghim</button>
+          </form>
+          <button id="hostUnpin" class="host-btn ghosty hidden">Bỏ ghim</button>
+        </div>
+        <div class="host-block">
+          <h3>🔇 Tắt chat một người</h3>
+          <p class="hint">Hoặc bấm 🔇 cạnh tên người đó ngay trong khung Trò chuyện.</p>
+          <div id="hostPeople" class="host-people"></div>
+        </div>
+        <a class="host-stats" href="/admin.html#stats" target="_blank" rel="noopener">📊 Xem thống kê (trang quản trị)</a>
+      </section>
+      <section id="chatView">
+        <div id="chatPin" class="chat-pin hidden"></div>
+        <div id="chatLog" role="log" aria-live="polite"><p class="chat-welcome">Nói gì với cả rạp bằng ô chat bên dưới nhé.</p></div>
+      </section>
+    </aside>
+
+    <button id="pinBar" class="pin-bar hidden" title="Tin nhắn được ghim — bấm để mở Trò chuyện"></button>
+    <!-- Ô chat luôn ở dưới -->
+    <form id="chatForm" class="quick-chat" autocomplete="off">
+      <button type="button" id="emojiBtn" class="emoji-trigger" aria-label="Chọn biểu tượng cảm xúc"><svg viewBox="0 0 24 24" width="21" height="21" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="10"/><path d="M8 14s1.5 2 4 2 4-2 4-2"/><line x1="9" x2="9.01" y1="9" y2="9"/><line x1="15" x2="15.01" y1="9" y2="9"/></svg></button>
+      <input id="chatInput" maxlength="160" placeholder="Nói gì với cả rạp đi…" aria-label="Tin nhắn cho cả rạp" />
+      <small id="chatCount">0/160</small>
+      <button type="submit" id="chatSend" aria-label="Gửi tin nhắn" disabled><svg viewBox="0 0 24 24" width="17" height="17" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M14.536 21.686a.5.5 0 0 0 .937-.024l6.5-19a.496.496 0 0 0-.635-.635l-19 6.5a.5.5 0 0 0-.024.937l7.93 3.18a2 2 0 0 1 1.112 1.11z"/><path d="m21.854 2.147-10.94 10.939"/></svg></button>
+      <section id="emojiPanel" class="popover hidden" role="dialog" aria-label="Biểu tượng cảm xúc">
+        <header><div><strong>Thêm chút cảm xúc</strong><span>Chọn emoji, rồi bấm gửi.</span></div><button type="button" id="emojiClose" class="x" aria-label="Đóng"><svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M18 6 6 18"/><path d="m6 6 12 12"/></svg></button></header>
+        <div id="emojiTabs"></div>
+        <div id="emojiGrid"></div>
+      </section>
+    </form>
+
+    <!-- Thả emoji, động tác, sân khấu, bỏng ngô -->
+    <div id="reactBar">
+      <div id="emojiBar"></div>
+      <div class="menu-wrap">
+        <button id="emoteBtn" class="act" title="Động tác của nhân vật">🙌 <span>Tương tác</span></button>
+        <div id="emoteMenu" class="popover hidden">
+          <button data-emote="dance">💃 Nhún nhảy</button>
+          <button data-emote="wave">👋 Vẫy tay</button>
+          <button data-emote="clap">👏 Vỗ tay</button>
+        </div>
+      </div>
+      <button id="stageBtn" class="act" title="Lên sân khấu quẩy 1 phút">🎤 <span>Lên sân khấu</span></button>
+      <button id="popcornBtn" class="act" title="Ném bỏng ngô (phím P). Bấm vào bạn bè để ném họ">🍿</button>
+      <button id="tomatoBtn" class="act throw" title="Ném cà chua lên màn hình khi video dở (phím T)" aria-label="Ném cà chua">🍅</button>
+      <button id="roseBtn" class="act throw" title="Ném hoa hồng lên màn hình khi video hay (phím R)" aria-label="Ném hoa hồng">🌹</button>
+    </div>
+
+    <!-- Đổi góc nhìn (góc dưới bên trái) -->
+    <div id="viewBar" role="group" aria-label="Đổi góc nhìn">
+      <button data-view="overview" class="on" title="Toàn cảnh rạp (phím V để đổi nhanh)" aria-label="Toàn cảnh rạp"><svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m15 15 6 6"/><path d="m15 9 6-6"/><path d="M21 16v5h-5"/><path d="M21 8V3h-5"/><path d="M3 16v5h5"/><path d="m3 21 6-6"/><path d="M3 8V3h5"/><path d="M9 9 3 3"/></svg></button>
+      <button data-view="seat" title="Góc nhìn từ ghế" aria-label="Góc nhìn từ ghế"><svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M20 9V6a2 2 0 0 0-2-2H6a2 2 0 0 0-2 2v3"/><path d="M2 16a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2v-5a2 2 0 0 0-4 0v1.5a.5.5 0 0 1-.5.5h-11a.5.5 0 0 1-.5-.5V11a2 2 0 0 0-4 0z"/><path d="M4 18v2"/><path d="M20 18v2"/><path d="M12 4v9"/></svg></button>
+      <button data-view="screen" title="Tập trung màn hình" aria-label="Tập trung màn hình"><svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect width="20" height="14" x="2" y="3" rx="2"/><line x1="8" x2="16" y1="21" y2="21"/><line x1="12" x2="12" y1="17" y2="21"/></svg></button>
+      <button data-view="audience" title="Nhìn khán giả từ phía màn hình" aria-label="Nhìn khán giả từ phía màn hình"><svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M22 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg></button>
+      <span class="bar-sep" aria-hidden="true"></span>
+      <button id="roomsBtn" class="rooms-btn" title="Phòng chiếu riêng cho nhóm bạn"><svg viewBox="0 0 24 24" width="19" height="19" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M18 20V6a2 2 0 0 0-2-2H8a2 2 0 0 0-2 2v14"/><path d="M2 20h20"/><path d="M14 12v.01"/></svg><span>Phòng riêng</span></button>
+    </div>
+
+    <!-- Âm thanh, laser, phụ đề -->
+    <div id="soundBar">
+      <button id="fsBtn" title="Toàn màn hình (phím F)" aria-label="Toàn màn hình"><svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path class="fs-in" d="M8 3H5a2 2 0 0 0-2 2v3m18 0V5a2 2 0 0 0-2-2h-3m0 18h3a2 2 0 0 0 2-2v-3M3 16v3a2 2 0 0 0 2 2h3"/><path class="fs-out" d="M8 3v3a2 2 0 0 1-2 2H3m18 0h-3a2 2 0 0 1-2-2V3m0 18v-3a2 2 0 0 1 2-2h3M3 16h3a2 2 0 0 1 2 2v3"/></svg></button>
+      <button id="focusBtn" title="Ẩn giao diện, chỉ giữ Trò chuyện (phím H)" aria-label="Ẩn giao diện"><svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M10.7 5.1A10.7 10.7 0 0 1 12 5c7 0 10 7 10 7a13.2 13.2 0 0 1-1.7 2.7"/><path d="M14.1 14.2a3 3 0 0 1-4.2-4.2"/><path d="M17.5 17.5A10.7 10.7 0 0 1 12 19c-7 0-10-7-10-7a13.2 13.2 0 0 1 4.5-5.5"/><path d="m2 2 20 20"/></svg></button>
+      <span class="bar-sep" aria-hidden="true"></span>
+      <button id="laserBtn" title="Bật tắt hiệu ứng laser trên máy bạn" aria-label="Hiệu ứng laser"><svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 14a1 1 0 0 1-.78-1.63l9.9-10.2a.5.5 0 0 1 .86.46l-1.92 6.02A1 1 0 0 0 13 10h7a1 1 0 0 1 .78 1.63l-9.9 10.2a.5.5 0 0 1-.86-.46l1.92-6.02A1 1 0 0 0 11 14z"/></svg></button>
+      <button id="ccBtn" title="Bật phụ đề video (chỉ trên máy bạn)" aria-label="Phụ đề"><svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect width="18" height="14" x="3" y="5" rx="2" ry="2"/><path d="M7 15h4M15 15h2M7 11h2M13 11h4"/></svg></button>
+      <button id="muteBtn" title="Tắt / bật tiếng" aria-label="Tắt / bật tiếng"><svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M11 4.702a.705.705 0 0 0-1.203-.498L6.413 7.587A1.4 1.4 0 0 1 5.416 8H3a1 1 0 0 0-1 1v6a1 1 0 0 0 1 1h2.416a1.4 1.4 0 0 1 .997.413l3.383 3.384A.705.705 0 0 0 11 19.298z"/><path d="M16 9a5 5 0 0 1 0 6"/><path d="M19.364 18.364a9 9 0 0 0 0-12.728"/></svg></button>
+      <input id="volume" type="range" min="0" max="100" value="80" aria-label="Âm lượng" />
+    </div>
+    <!-- Chế độ ẩn giao diện: chỉ còn nút Trò chuyện + nút hiện lại -->
+    <div id="focusBar" class="hidden">
+      <button id="focusChat" title="Trò chuyện" aria-label="Trò chuyện"><svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M21 12a8 8 0 0 1-11.6 7.1L4 20l1-4.6A8 8 0 1 1 21 12z"/></svg><span>Trò chuyện</span><b id="focusUnread" class="badge hidden">0</b></button>
+      <button id="focusExit" title="Hiện lại giao diện (phím H)" aria-label="Hiện lại giao diện"><svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M2 12s3-7 10-7 10 7 10 7-3 7-10 7-10-7-10-7z"/><circle cx="12" cy="12" r="3"/></svg></button>
+    </div>
+    <button id="soundBtn" class="hidden">🔇 Bấm để bật tiếng</button>
+
+    <div id="hint">Bấm ghế trống để đổi chỗ · Bấm vào bạn bè để ném bỏng ngô · Kéo chuột để nhìn quanh · Phím V đổi góc nhìn</div>
+    <div id="seatTip" class="hidden"></div>
+    <div id="toast" class="hidden"></div>
+    <div id="burstLayer" aria-hidden="true"></div>
+  </div>
+
+  <!-- Xếp hạng tuần -->
+  <div id="leaderModal" class="modal hidden">
+    <div class="card wide">
+      <div class="modal-head"><div><span class="eyebrow">ĐUA TOP MỖI TUẦN</span><h2>🏆 Xếp hạng tuần</h2><p>Xem phim, chat, lên sân khấu để leo hạng. Cuối tuần top đầu nhận 🍿 thưởng.</p></div><button class="x" data-close="leaderModal" aria-label="Đóng"><svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M18 6 6 18"/><path d="m6 6 12 12"/></svg></button></div>
+      <section id="actLeader">
+        <div class="leader-top"><div id="lbCats" class="seg-chips"></div><span id="lbEnds" class="muted small"></span></div>
+        <div id="lbList" class="leader-list"></div>
+        <div id="lbMine" class="leader-mine"></div>
+        <p id="lbPrizes" class="hint"></p>
+        <details id="lbLast" class="donation-history hidden"><summary>Người thắng tuần trước</summary><div id="lbLastList"></div></details>
+      </section>
+    </div>
+  </div>
+
+  <!-- Hoạt động: điểm danh, nhiệm vụ, lịch chiếu, mời bạn -->
+  <div id="activityModal" class="modal hidden">
+    <div class="card wide">
+      <div class="modal-head"><div><span class="eyebrow">MỖI NGÀY MỘT CHÚT VUI</span><h2>Ghé rạp mỗi ngày, quà càng nhiều.</h2><p>Điểm danh, làm nhiệm vụ, hẹn nhau xem Đêm phim và đua top tuần để nhận 🍿.</p></div><button class="x" data-close="activityModal" aria-label="Đóng"><svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M18 6 6 18"/><path d="m6 6 12 12"/></svg></button></div>
+      <div class="tabs" id="actTabs">
+        <button data-tab="daily" class="on">🎯 Điểm danh & nhiệm vụ</button>
+        <button data-tab="events">📅 Lịch chiếu</button>
+        <button data-tab="invite">🤝 Mời bạn</button>
+      </div>
+      <section id="actDaily">
+        <div class="checkin-card">
+          <div class="checkin-head"><div><strong id="ciStreak">🔥 Chuỗi 0 ngày</strong><span id="ciHint">Điểm danh liên tục để nhận quà lớn hơn. Bỏ 1 ngày là chuỗi tính lại từ đầu.</span></div>
+            <button id="ciBtn" class="primary">Điểm danh</button></div>
+          <div id="ciDays" class="checkin-days"></div>
+        </div>
+        <div class="mission-head"><strong>Nhiệm vụ hôm nay</strong><span id="msReset" class="muted small"></span></div>
+        <div id="msList" class="mission-list"></div>
+      </section>
+      <section id="actEvents" class="hidden">
+        <div id="evList" class="event-list"></div>
+        <p class="hint">Trong giờ Đêm phim, mỗi phút xem phim được nhân 🍿. Bấm 🔔 để được nhắc trước 10 phút và lúc bắt đầu (cần mở trang rạp).</p>
+      </section>
+      <section id="actInvite" class="hidden">
+        <div class="invite-card">
+          <div class="invite-steps">
+            <div><b>1</b><span>Gửi link riêng của bạn cho bạn bè</span></div>
+            <div><b>2</b><span>Bạn bè tạo tài khoản qua link: <strong>cả hai +<i id="ivBonus">30</i> 🍿</strong></span></div>
+            <div><b>3</b><span>Bạn bè xem đủ <i id="ivMinutes">60</i> phút: bạn <strong>+<i id="ivDone">50</i> 🍿</strong> và món hiếm <strong>💘 Kính trái tim</strong></span></div>
+          </div>
+          <div class="invite-link">
+            <input id="ivLink" readonly aria-label="Link mời của bạn" />
+            <button id="ivCopy" class="primary small">Sao chép</button>
+            <button id="ivShare" class="ghost small hidden">Chia sẻ…</button>
+          </div>
+        </div>
+        <div class="invite-stats">
+          <div><b id="ivJoined">0</b><span>bạn đã tạo tài khoản</span></div>
+          <div><b id="ivWatched">0</b><span>bạn đã xem đủ 1 giờ</span></div>
+          <div><b id="ivRare">🔒</b><span>Kính trái tim</span></div>
+        </div>
+        <p id="ivInvitedBy" class="hint hidden"></p>
+        <p class="hint">Mỗi ngày tối đa 5 lời mời được thưởng 🍿. Món hiếm chỉ mở khi bạn bè thật sự ngồi xem cùng rạp.</p>
+      </section>
+    </div>
+  </div>
+
+  <!-- Ra câu đoán -->
+  <div id="pollModal" class="modal hidden">
+    <div class="card">
+      <div class="modal-head"><div><span class="eyebrow">ĐOÁN NHANH CÙNG CẢ RẠP</span><h2>Ra một câu đoán.</h2><p>Mọi người chọn đáp án, hết giờ bạn công bố kết quả. Ai đoán đúng được 🍿.</p></div><button class="x" data-close="pollModal" aria-label="Đóng"><svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M18 6 6 18"/><path d="m6 6 12 12"/></svg></button></div>
+      <form id="pollForm" class="poll-form">
+        <label for="pqQuestion">Câu hỏi</label>
+        <input id="pqQuestion" maxlength="100" placeholder="VD: Ai là hung thủ? · Đội nào ghi bàn tiếp theo?" />
+        <label>Các lựa chọn (2–4)</label>
+        <div id="pqOptions" class="pq-options"></div>
+        <button type="button" id="pqAdd" class="ghost small">+ Thêm lựa chọn</button>
+        <label>Thời gian cho mọi người đoán</label>
+        <div id="pqSeconds" class="seg-chips"></div>
+        <div id="pqMsg" class="err"></div>
+        <button type="submit" class="primary">Bắt đầu cho đoán</button>
+      </form>
+    </div>
+  </div>
+
+  <!-- Phòng chiếu riêng -->
+  <div id="roomsModal" class="modal hidden">
+    <div class="card wide">
+      <div class="modal-head"><div><span class="eyebrow">PHÒNG CHIẾU</span><h2>Xem riêng với hội bạn.</h2><p>Tạo phòng nhỏ có mật khẩu, xem video riêng mà vẫn ở chung toà rạp và vẫn tích 🍿.</p></div><button class="x" data-close="roomsModal" aria-label="Đóng"><svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M18 6 6 18"/><path d="m6 6 12 12"/></svg></button></div>
+      <div id="roomCurrent" class="room-current"></div>
+      <div id="roomList" class="room-list"></div>
+      <form id="roomCreateForm" class="room-create">
+        <h3>Mở phòng mới</h3>
+        <div class="room-create-row">
+          <label>Tên phòng<input id="roomNameIn" maxlength="30" placeholder="VD: Hội bạn thân" autocomplete="off" /></label>
+          <label>Mật khẩu (không bắt buộc)<input id="roomPassIn" maxlength="30" placeholder="Để trống = ai cũng vào được" autocomplete="off" /></label>
+        </div>
+        <button type="submit" class="primary">Tạo phòng và vào luôn</button>
+        <p class="hint">Mỗi người mở 1 phòng một lúc. Phòng không còn ai trong 3 phút sẽ tự đóng. Chủ phòng được ra câu đoán bất cứ lúc nào.</p>
+      </form>
+      <p id="roomErr" class="err"></p>
+    </div>
+  </div>
+
+  <!-- Tặng quà -->
+  <div id="giftModal" class="modal hidden">
+    <div class="card">
+      <div class="modal-head"><div><span class="eyebrow">TẶNG QUÀ</span><h2 id="giftTitle">Tặng quà</h2><p>Quà hiện trên đầu nhân vật người nhận và cả phòng đều thấy.</p></div><button class="x" data-close="giftModal" aria-label="Đóng"><svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M18 6 6 18"/><path d="m6 6 12 12"/></svg></button></div>
+      <div id="giftList" class="gift-list" role="radiogroup" aria-label="Chọn quà"></div>
+      <p class="hint" id="giftBalance"></p>
+      <button id="giftSend" class="primary">Tặng quà</button>
+      <p id="giftErr" class="err"></p>
+    </div>
+  </div>
+
+  <!-- Chọn ghế -->
+  <div id="seatModal" class="modal hidden">
+    <div class="card wide">
+      <div class="modal-head"><div><span class="eyebrow">100 CHỖ · CÙNG MỘT MÀN HÌNH</span><h2>Chọn một chỗ thật ưng.</h2><p>10 hàng · 100 chỗ · Ghế đơn, ghế đôi và ghế ba. Bạn có thể đổi chỗ bất kỳ lúc nào.</p></div><button class="x" data-close="seatModal" aria-label="Đóng"><svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M18 6 6 18"/><path d="m6 6 12 12"/></svg></button></div>
+      <div class="seatmap-screen"><svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect width="20" height="14" x="2" y="3" rx="2"/><line x1="8" x2="16" y1="21" y2="21"/><line x1="12" x2="12" y1="17" y2="21"/></svg> MÀN HÌNH CHIẾU</div>
+      <div id="seatMap" class="seatmap"></div>
+      <div class="seat-legend">
+        <span><i class="empty"></i>Còn trống</span><span><i class="taken"></i>Đã có người</span>
+        <span><i class="mine"></i>Ghế của bạn</span><span><i class="bot-seat"></i>Bot · Có thể chọn</span>
+      </div>
+      <div class="seatmap-footer"><span><strong id="seatFree">0</strong> ghế đang trống</span><span>Bot sẽ nhường khi bạn chọn ghế.</span></div>
+    </div>
+  </div>
+
+  <!-- Gửi video -->
+  <div id="videoModal" class="modal hidden">
+    <div class="card">
+      <div class="modal-head"><div><span class="eyebrow">CÙNG CHỌN, CÙNG XEM</span><h2>Mang gu của bạn lên màn ảnh.</h2><p>Dán link YouTube, xem trước rồi thêm vào hàng chờ để cả rạp bình chọn thứ tự chiếu.</p></div><button class="x" data-close="videoModal" aria-label="Đóng"><svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M18 6 6 18"/><path d="m6 6 12 12"/></svg></button></div>
+      <form id="videoForm" autocomplete="off">
+        <label for="videoUrl">Đường dẫn YouTube</label>
+        <div class="input-wrap"><svg viewBox="0 0 24 24" width="17" height="17" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"/><path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"/></svg><input id="videoUrl" type="url" placeholder="https://www.youtube.com/watch?v=…" /></div>
+        <button id="videoPreviewBtn" type="submit" class="primary">Xem trước video →</button>
+      </form>
+      <div id="videoPreview" class="hidden">
+        <div class="video-preview"><img id="vpThumb" alt="Ảnh xem trước video" /><div><h3 id="vpTitle"></h3><p id="vpMeta"></p></div></div>
+        <div class="mood-pick">
+          <span class="mood-label">Không khí khi chiếu video này</span>
+          <div id="vpMood" class="mood-chips" role="radiogroup" aria-label="Không khí khi chiếu">
+            <button type="button" data-mood="normal" class="on" role="radio" aria-checked="true"><b>🎬</b>Bình thường<small>Tắt đèn nhẹ</small></button>
+            <button type="button" data-mood="party" role="radio" aria-checked="false"><b>⚡</b>Sôi động<small>Disco, laser theo nhịp</small></button>
+            <button type="button" data-mood="horror" role="radio" aria-checked="false"><b>👻</b>Kinh dị<small>Tối hẳn, đèn chập chờn</small></button>
+            <button type="button" data-mood="romance" role="radio" aria-checked="false"><b>🌹</b>Lãng mạn<small>Ánh hồng, cánh hoa rơi</small></button>
+          </div>
+        </div>
+        <label id="vpBpmWrap" class="hidden">Nhịp đèn (BPM)
+          <input id="vpBpm" type="number" min="60" max="180" step="1" value="128" />
+          <small class="hint">Chỉnh cho hợp với bài nhạc. Đèn chạy theo nhịp bạn đặt, không tự bắt nhịp từ âm thanh.</small>
+        </label>
+        <p class="hint" id="vpLimit">Mỗi tài khoản có tối đa 5 video trong hàng chờ.</p>
+        <button id="videoAddBtn" class="primary"><svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 12h14"/><path d="M12 5v14"/></svg> Thêm vào hàng chờ</button>
+      </div>
+      <p id="videoErr" class="err"></p>
+    </div>
+  </div>
+
+  <!-- Chiếu ảnh -->
+  <div id="postModal" class="modal hidden">
+    <div class="card">
+      <div class="modal-head"><div><span class="eyebrow">KHOẢNH KHẮC CỦA CẢ RẠP</span><h2>Khoảnh khắc của bạn trên màn ảnh.</h2><p id="postSub">Chọn ảnh, viết lời nhắn và chọn thời gian chiếu. Phí trừ vào 🍿 của bạn.</p></div><button class="x" data-close="postModal" aria-label="Đóng"><svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M18 6 6 18"/><path d="m6 6 12 12"/></svg></button></div>
+      <label class="file-drop" id="fileDrop">
+        <input id="postFile" type="file" accept="image/*,.heic,.heif" />
+        <img id="postPreview" class="hidden" alt="Ảnh xem trước" />
+        <span id="postPick"><svg viewBox="0 0 24 24" width="36" height="36" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M16 5h6"/><path d="M19 2v6"/><path d="M21 11.5V19a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h7.5"/><path d="m21 15-3.086-3.086a2 2 0 0 0-2.828 0L6 21"/><circle cx="9" cy="9" r="2"/></svg><br />Chọn ảnh từ máy hoặc điện thoại<br /><small>JPG, PNG, WebP, GIF · tối đa 12MB</small></span>
+      </label>
+      <label for="postText">Lời nhắn trên màn chiếu</label>
+      <input id="postText" maxlength="100" placeholder="Ví dụ: Chúc cả rạp một buổi tối thật vui!" />
+      <label>Thời gian chiếu</label>
+      <div id="postSeconds" class="seg"></div>
+      <div class="post-balance"><span>Bạn còn <b id="postBalance">0</b> 🍿</span><button type="button" class="link-btn" id="postTopup">💖 Ủng hộ để có thêm 🍿</button></div>
+      <div id="postMsg"></div>
+      <div class="modal-actions">
+        <button id="postCancel" class="ghost" data-close="postModal">Huỷ</button>
+        <button id="postSend" disabled>Chiếu lên màn hình</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Ủng hộ -->
+  <div id="supportModal" class="modal hidden">
+    <div class="card wide">
+      <div class="modal-head"><div><span class="eyebrow">MỘT CHIẾC RẠP ĐƯỢC NUÔI BẰNG YÊU THƯƠNG</span><h2>Ủng hộ, thêm niềm vui cho cả rạp.</h2><p>Sự ủng hộ của bạn giúp duy trì rạp. Mỗi 1.000đ đổi được 10 🍿 — dùng để lên hạng, mở tủ đồ, chiếu ảnh và chen video.</p></div><button class="x" data-close="supportModal" aria-label="Đóng"><svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M18 6 6 18"/><path d="m6 6 12 12"/></svg></button></div>
+      <div id="supportOff" class="hidden notice">Chủ rạp chưa mở chức năng ủng hộ. Bạn vẫn kiếm được 🍿 bằng cách xem phim cùng mọi người nhé!</div>
+      <div id="supportOn">
+        <div id="supportTiers" class="support-tiers"></div>
+        <div class="support-grid">
+          <section class="qr-section">
+            <div class="qr-bank"><span id="qrBankId">MB</span><strong>VietQR</strong></div>
+            <div class="qr-image"><img id="qrImg" alt="Mã QR chuyển khoản" /></div>
+            <span class="qr-caption">Quét bằng ứng dụng ngân hàng</span>
+            <strong id="qrAmount" class="qr-amount">20.000đ</strong>
+          </section>
+          <section class="transfer-info">
+            <div class="transfer-row"><span>NGÂN HÀNG THỤ HƯỞNG</span><strong id="bankName"></strong></div>
+            <div class="transfer-row"><span>CHỦ TÀI KHOẢN</span><strong id="bankAccName"></strong></div>
+            <div class="transfer-row"><span>SỐ TÀI KHOẢN</span><div><strong id="bankAccNo"></strong><button class="copy-btn" data-copy="bankAccNo" title="Sao chép số tài khoản">Sao chép</button></div></div>
+            <div class="transfer-row transfer-note"><span>NỘI DUNG CHUYỂN KHOẢN</span><div><strong id="bankNote"></strong><button class="copy-btn" data-copy="bankNote" title="Sao chép nội dung">Sao chép</button></div>
+              <small>Mã riêng của tài khoản bạn — giúp chủ rạp biết ai đã ủng hộ. Đã tự điền trong mã QR.</small></div>
+            <div id="supportPending" class="support-waiting hidden"></div>
+            <label class="support-ack"><input type="checkbox" id="supportAck" /><span>Tôi đã chuyển <strong id="ackAmount">20.000đ</strong> với đúng nội dung ở trên.</span></label>
+            <button id="supportSend" class="primary" disabled><svg viewBox="0 0 24 24" width="17" height="17" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M19 14c1.49-1.46 3-3.21 3-5.5A5.5 5.5 0 0 0 16.5 3c-1.76 0-3 .5-4.5 2-1.5-1.5-2.74-2-4.5-2A5.5 5.5 0 0 0 2 8.5c0 2.3 1.5 4.05 3 5.5l7 7Z"/></svg> Đã chuyển tiền · Báo chủ rạp</button>
+            <p class="hint">Chỉ bấm sau khi chuyển tiền thành công. Chủ rạp kiểm tra tài khoản rồi duyệt, 🍿 sẽ được cộng ngay khi duyệt.</p>
+          </section>
+        </div>
+      </div>
+      <div class="support-summary">
+        <span>🍿 còn dùng được <strong id="supBalance">0</strong></span>
+        <span>Tổng đã ủng hộ <strong id="supDonated">0đ</strong></span>
+        <button class="link-btn" id="supWardrobe">Mở tủ đồ →</button>
+      </div>
+      <details id="supHistory" class="donation-history hidden"><summary>Lịch sử ủng hộ (<span id="supHistCount">0</span>)</summary><div id="supHistList"></div></details>
+      <p id="supportErr" class="err"></p>
+    </div>
+  </div>
+
+  <!-- Tủ đồ -->
+  <div id="wardrobeModal" class="modal hidden">
+    <div class="card wide">
+      <div class="wd-head"><h2>👗 Tủ đồ</h2><button id="wdClose" class="x" aria-label="Đóng">✕</button></div>
+      <div class="wd-body">
+        <div class="wd-left">
+          <canvas id="wdCanvas" title="Kéo để xoay nhân vật"></canvas>
+          <div id="wdName" class="wd-name"></div>
+          <div id="wdTier" class="tier-chip"></div>
+          <div class="tier-progress"><i id="wdBar"></i></div>
+          <div id="wdNext" class="muted small"></div>
+          <div class="wd-balance">🍿 còn dùng được: <b id="wdBalance">0</b></div>
+          <button id="wdSupport" type="button" class="link-btn">💖 Ủng hộ để mở nhanh</button>
+        </div>
+        <div class="wd-right">
+          <div class="tabs" id="wdTabs">
+            <button data-tab="look" class="on">Ngoại hình</button>
+            <button data-tab="hat">Mũ</button>
+            <button data-tab="body">Trang phục</button>
+            <button data-tab="acc">Phụ kiện</button>
+            <button data-tab="tiers">Hạng</button>
+          </div>
+          <div id="wdPanel"></div>
+        </div>
+      </div>
+      <div id="wdMsg"></div>
+      <div class="modal-actions">
+        <button id="wdCancel" class="ghost">Huỷ</button>
+        <button id="wdSave">Lưu thay đổi</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Nội quy -->
+  <div id="rulesModal" class="modal hidden">
+    <div class="card">
+      <h2>📜 Nội quy rạp</h2>
+      <ol class="rules">
+        <li>Lịch sự với mọi người: không xúc phạm, chửi bới, quấy rối.</li>
+        <li>Không gửi video, ảnh hay tin nhắn có nội dung đồi truỵ, bạo lực, lừa đảo, vi phạm pháp luật.</li>
+        <li>Không spam tin nhắn, video, ảnh.</li>
+        <li>Tôn trọng bản quyền và quyền riêng tư: không chiếu ảnh người khác khi chưa được đồng ý.</li>
+        <li>Tự giữ bí mật mật khẩu của mình.</li>
+        <li>Chủ rạp có thể xoá tài khoản vi phạm.</li>
+      </ol>
+      <p class="muted small">Rạp lưu tên tài khoản, biệt danh, nhân vật, trang phục và điểm của bạn. Mật khẩu được mã hoá, không ai đọc được.</p>
+      <div class="modal-actions"><button id="rulesClose">Đã hiểu</button></div>
+    </div>
+  </div>
+
+  <!-- Màn hình vào rạp -->
+  <div id="joinScreen">
+    <div class="card">
+      <h1 class="join-logo"><img src="/img/logo.svg" alt="" width="64" height="64" /><span>Rạp Mây</span></h1>
+      <p class="tagline">Xem phim trên mây cùng hội bạn. 100 ghế đơn, đôi, ba — bình chọn YouTube và trò chuyện cùng bạn bè.</p>
+      <div id="joinNow" class="now-chip">Đang kết nối…</div>
+
+      <div id="authBox" class="hidden">
+        <div class="tabs" id="authTabs">
+          <button type="button" data-auth="login" class="on">Đăng nhập</button>
+          <button type="button" data-auth="signup">Tạo tài khoản</button>
+        </div>
+        <form id="loginForm" class="auth-form" autocomplete="on">
+          <label for="loginUser">Tài khoản</label>
+          <input id="loginUser" autocomplete="username" autocapitalize="none" placeholder="Ít nhất 4 ký tự" />
+          <label for="loginPass">Mật khẩu</label>
+          <input id="loginPass" type="password" autocomplete="current-password" placeholder="Ít nhất 6 ký tự" />
+          <button type="submit" class="primary">Vào rạp thôi →</button>
+        </form>
+        <form id="signupForm" class="auth-form hidden" autocomplete="on">
+          <div id="inviteNote" class="invite-note hidden"></div>
+          <label for="suUser">Tài khoản</label>
+          <input id="suUser" autocomplete="username" autocapitalize="none" maxlength="20" placeholder="4–20 ký tự: chữ không dấu, số, _ hoặc ." />
+          <label for="suPass">Mật khẩu</label>
+          <input id="suPass" type="password" autocomplete="new-password" placeholder="Ít nhất 6 ký tự" />
+          <label for="suPass2">Nhập lại mật khẩu</label>
+          <input id="suPass2" type="password" autocomplete="new-password" placeholder="Nhập lại mật khẩu" />
+          <label for="suName">Biệt danh trong rạp</label>
+          <input id="suName" maxlength="20" placeholder="Ví dụ: Tí Nị" />
+          <label>Chọn nhân vật</label>
+          <div id="charPicker" class="char-grid"></div>
+          <label class="check"><input type="checkbox" id="suAgree" /> Tôi đã đọc và đồng ý với <a href="#" id="rulesLink">nội quy rạp</a></label>
+          <button type="submit" class="primary">Tạo tài khoản</button>
+        </form>
+        <div id="authMsg" class="err"></div>
+      </div>
+
+      <div id="lobbyBox" class="hidden">
+        <div class="lobby-me">
+          <img id="lobbyAvatar" alt="" />
+          <div class="lobby-info">
+            <div id="lobbyName" class="wd-name"></div>
+            <div id="lobbyTier" class="tier-chip"></div>
+            <div class="tier-progress"><i id="lobbyBar"></i></div>
+            <div id="lobbyNext" class="muted small"></div>
+          </div>
+        </div>
+        <button id="joinBtn" class="primary" disabled>🎟️ Vào rạp</button>
+        <div class="lobby-actions">
+          <button id="lobbyWardrobe" class="ghost">👗 Tủ đồ</button>
+          <button id="logoutBtn" class="ghost">Đăng xuất</button>
+        </div>
+        <div id="joinMsg"></div>
+      </div>
+    </div>
+  </div>
+
+  <script type="module" src="js/main.js"></script>
+</body>
+</html>

@@ -1,0 +1,15 @@
+# Câu chat cho bot — mỗi dòng là 1 câu. Dòng trống và dòng bắt đầu bằng # sẽ bị bỏ qua.
+# Viết {ten} để bot gọi tên ngẫu nhiên một người thật đang ở trong rạp.
+# Sửa file này lúc nào cũng được, rạp tự đọc lại sau vài giây (không cần tắt server).
+Đoạn này hay quá trời 😂
+Ai có bỏng ngô cho xin miếng 🍿
+Video tiếp theo là gì vậy mọi người?
+Hello {ten} 👋
+Âm thanh rạp này đỉnh thật
+Cho xin thêm bài nhạc sôi động đi 🔥
+Ai lên sân khấu quẩy với mình không?
+Haha chịu luôn 🤣
+Rạp hôm nay đông vui ghê
+{ten} ơi ngồi gần mình nè 💞
+Mai xem tiếp nha
+Coi xong đoạn này đi ngủ 😴

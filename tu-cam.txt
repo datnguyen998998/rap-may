@@ -1,0 +1,35 @@
+# Từ cấm trong chat — mỗi dòng 1 từ hoặc cụm từ. Dòng trống và dòng bắt đầu bằng # bị bỏ qua.
+# Không phân biệt chữ hoa / thường, nhưng CÓ phân biệt dấu (vì tiếng Việt bỏ dấu dễ trùng từ bình thường,
+# ví dụ "dị" với "đĩ"). Muốn chặn cả kiểu viết không dấu thì ghi thêm 1 dòng, ví dụ "đm" và "dm".
+# Chỉ che khi đứng thành từ riêng (ghi "dm" thì chữ "admin" vẫn bình thường).
+# Tin nhắn chat, tin ghim, chữ trên ảnh chiếu, câu đoán bị che thành ***; biệt danh và tên phòng có từ cấm thì không đặt được.
+# Sửa file lúc nào cũng được, rạp tự đọc lại sau vài giây (không cần tắt server).
+đm
+dm
+đmm
+dmm
+đcm
+dcm
+đkm
+dkm
+vcl
+vkl
+vl
+clgt
+cmn
+đéo
+deo
+đếch
+địt
+djt
+đụ
+lồn
+buồi
+cặc
+đĩ
+óc chó
+mẹ mày
+ngu như chó
+fuck
+shit
+bitch
