@@ -886,6 +886,10 @@ export class Theater {
     this.raycaster = new THREE.Raycaster();
     const ptr = new THREE.Vector2();
     let down = null;
+    // chụm / mở 2 ngón tay để thu nhỏ / phóng to (điện thoại, máy tính bảng)
+    const pts = new Map();
+    let pinch = null;
+    const pinchDist = () => { const [a, b] = [...pts.values()]; return Math.hypot(a.x - b.x, a.y - b.y) || 1; };
 
     const toNdc = (e) => {
       const r = el.getBoundingClientRect();
@@ -893,10 +897,26 @@ export class Theater {
     };
 
     el.addEventListener('pointerdown', (e) => {
+      pts.set(e.pointerId, { x: e.clientX, y: e.clientY });
+      try { el.setPointerCapture(e.pointerId); } catch { /* bỏ qua */ }
+      if (pts.size >= 2) {
+        // ngón thứ 2 chạm vào: chuyển sang chụm để phóng to/thu nhỏ, huỷ kéo xoay
+        pinch = { d: pinchDist(), z: this.zoom || 0 };
+        down = null;
+        return;
+      }
       down = { x: e.clientX, y: e.clientY, yaw: this.yaw, pitch: this.pitch, moved: false };
-      el.setPointerCapture(e.pointerId);
     });
     el.addEventListener('pointermove', (e) => {
+      if (pts.has(e.pointerId)) pts.set(e.pointerId, { x: e.clientX, y: e.clientY });
+      if (pinch) {
+        if (pts.size >= 2) {
+          // mở rộng 2 ngón = phóng to (giảm góc nhìn), chụm lại = thu nhỏ
+          this.zoom = THREE.MathUtils.clamp(pinch.z + (pinch.d / pinchDist() - 1) * 45, -30, 15);
+          this.applyFov();
+        }
+        return;
+      }
       if (down) {
         const dx = e.clientX - down.x, dy = e.clientY - down.y;
         if (Math.hypot(dx, dy) > 6) down.moved = true;
@@ -913,7 +933,16 @@ export class Theater {
       el.style.cursor = hit && hit.user?.id !== this.myId ? 'pointer' : 'grab';
       this.onHover(hit, e.clientX, e.clientY);
     });
+    const endPointer = (e) => {
+      pts.delete(e.pointerId);
+      if (pinch) {
+        if (pts.size < 2) { pinch = null; down = null; } // nhấc ngón: không tính là bấm chọn ghế
+        return true;
+      }
+      return false;
+    };
     el.addEventListener('pointerup', (e) => {
+      if (endPointer(e)) return;
       if (down && !down.moved) {
         toNdc(e);
         const hit = this.pick(ptr);
@@ -921,9 +950,11 @@ export class Theater {
       }
       down = null;
     });
-    el.addEventListener('pointercancel', () => { down = null; });
+    el.addEventListener('pointercancel', (e) => { endPointer(e); down = null; });
     el.addEventListener('pointerleave', () => { this.setHover(-1); this.onHover(null); });
-    el.addEventListener('dblclick', () => { this.yaw = 0; this.pitch = 0; });
+    el.addEventListener('dblclick', () => { this.yaw = 0; this.pitch = 0; this.zoom = 0; this.applyFov(); }); // nhấp đúp: về góc nhìn và độ phóng mặc định
+    // Safari trên iPhone/iPad: chặn cử chỉ phóng to cả trang, để 2 ngón tay chỉ phóng to rạp
+    for (const ev of ['gesturestart', 'gesturechange', 'gestureend']) el.addEventListener(ev, (e) => e.preventDefault());
     el.addEventListener('wheel', (e) => {
       this.zoom = THREE.MathUtils.clamp((this.zoom || 0) + e.deltaY * 0.03, -30, 15);
       this.applyFov();
