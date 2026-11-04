@@ -1126,3 +1126,28 @@ body.hud-idle #topbar .top-act { opacity: 1; }
   #soundBtn { bottom: 92px; }
   .pin-bar { top: 44px; max-width: 46vw; font-size: 12px; }
 }
+
+/* =====================================================================
+   SỬA LỖI ĐIỆN THOẠI (đợt kiểm tra 04/11)
+   ===================================================================== */
+@media (max-width: 760px) {
+  /* Ngăn Trò chuyện / Hàng chờ / Bạn bè / Quản lý: không bị menu phải và các thanh dưới che.
+     Nằm giữa menu phải (bên phải) và thanh thả cảm xúc (bên dưới), nút ✕ luôn bấm được. */
+  #drawer {
+    left: 8px; right: calc(var(--dock-w) + 14px); top: auto; bottom: 140px; width: auto;
+    height: min(52vh, calc(100vh - 200px)); border-radius: 16px; z-index: 8;
+  }
+  .drawer-head { padding: 12px 12px 8px; }
+  .drawer-head h2 { font-size: 18px; }
+  #chatLog { padding: 4px 12px 12px; }
+  body.focus-mode #drawer { right: 8px; bottom: 124px; }
+
+  /* Dải tin ghim: chuyển xuống ngay trên thanh thả cảm xúc, không đè tên bài đang phát */
+  .pin-bar { top: auto; bottom: 140px; left: 8px; right: calc(var(--dock-w) + 14px); transform: none; max-width: none; }
+  body.drawer-open .pin-bar { display: none; } /* đang mở ngăn chat: tin ghim đã hiện ở đầu ngăn */
+}
+@media (max-height: 500px) and (orientation: landscape) {
+  /* xoay ngang: dải ghim nằm trên cùng, bên phải khối tên bài */
+  .pin-bar { top: 44px; bottom: auto; left: 322px; right: calc(var(--dock-w) + 14px); transform: none; max-width: none; font-size: 12px; }
+  body.drawer-open .pin-bar { right: calc(var(--dock-w) + 358px); }
+}
