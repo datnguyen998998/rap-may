@@ -54,6 +54,20 @@
     .tbl { margin-top: 12px; font-size: 13px; color: var(--muted); }
     .tbl table { margin-top: 8px; }
     @media (max-width: 640px) { .tiles { grid-template-columns: repeat(2, minmax(0, 1fr)); } .chart.hours .col:nth-child(odd) .lab { display: none; } }
+    .sec-form { display: grid; grid-template-columns: 1.4fr 1fr auto; gap: 8px; align-items: end; margin: 8px 0 6px; }
+    .sec-form label { font-size: 12px; color: var(--muted); display: block; margin-bottom: 4px; }
+    .sec-form .chk { grid-column: 1 / -1; font-size: 13px; color: var(--muted); display: flex; gap: 8px; align-items: center; }
+    .sec-form .chk input { width: auto; }
+    .danger { background: #c94a4a; color: #fff; }
+    .small { padding: 6px 10px; font-size: 12px; }
+    .ipcell { font-family: ui-monospace, Consolas, monospace; font-size: 13px; }
+    .tag { display: inline-block; font-size: 11px; padding: 2px 7px; border-radius: 999px; background: rgba(255,255,255,.08); color: var(--muted); margin-left: 4px; }
+    .tag.red { background: rgba(255, 107, 107, .15); color: #ff8a8a; }
+    .tag.hot { background: rgba(255, 207, 77, .15); color: var(--accent); }
+    details.acc summary { cursor: pointer; color: var(--muted); font-size: 13px; }
+    details.acc table { margin-top: 6px; }
+    .sec-rule { font-size: 13px; color: var(--muted); margin: 0 0 6px; line-height: 1.5; }
+    @media (max-width: 640px) { .sec-form { grid-template-columns: 1fr; } }
     .warn { background: rgba(255, 207, 77, .1); color: var(--accent); padding: 12px; border-radius: 12px; margin-bottom: 12px; font-size: 14px; }
   </style>
 </head>
@@ -102,6 +116,30 @@
       <div id="chartTip" class="chart-tip" hidden></div>
     </div>
 
+    <div id="secBox" class="card" hidden style="margin-top:18px">
+      <div class="bar"><h2 id="security" style="margin:0;font-size:20px">🛡️ An ninh</h2><button class="no small" id="secReload">Tải lại</button></div>
+      <div id="secTiles" class="tiles"></div>
+      <p id="secRule" class="sec-rule"></p>
+      <h3 class="ch-title">Chặn một IP</h3>
+      <p class="ch-sub">IP bị chặn không vào được rạp, mọi kết nối đang mở từ IP đó bị ngắt ngay. Nên chặn có thời hạn: nhiều người có thể dùng chung một IP (cùng wifi, cùng mạng 4G).</p>
+      <div class="sec-form">
+        <div><label for="secIp">Địa chỉ IP</label><input id="secIp" placeholder="VD: 113.160.12.34" /></div>
+        <div><label for="secDur">Thời hạn</label><select id="secDur"><option value="60">1 giờ</option><option value="1440" selected>1 ngày</option><option value="10080">7 ngày</option><option value="0">Vĩnh viễn</option></select></div>
+        <button class="danger" id="secBan">Chặn IP</button>
+        <label class="chk"><input type="checkbox" id="secAlso" checked /> Khoá luôn các tài khoản được tạo từ IP này</label>
+      </div>
+      <div class="err" id="secErr"></div>
+      <h3 class="ch-title">IP tạo nhiều tài khoản</h3>
+      <p class="ch-sub">Mỗi dòng là một IP đã tạo từ 2 tài khoản trở lên (mới nhất lên đầu). Nhiều tài khoản mới trong 24 giờ, xem rất ít phút: dấu hiệu tài khoản clone.</p>
+      <table><thead><tr><th>IP</th><th>Tài khoản</th><th>24 giờ qua</th><th>Đang online</th><th></th></tr></thead><tbody id="secGroups"></tbody></table>
+      <h3 class="ch-title">Đang bị chặn / bị khoá</h3>
+      <table><thead><tr><th>IP / Tài khoản</th><th>Lý do</th><th>Đến khi</th><th></th></tr></thead><tbody id="secBans"></tbody></table>
+      <div class="sec-form" style="grid-template-columns: 1fr auto; margin-top: 14px">
+        <div><label for="secUser">Khoá một tài khoản theo tên đăng nhập</label><input id="secUser" placeholder="tên đăng nhập" /></div>
+        <button class="danger" id="secBanUser">Khoá tài khoản</button>
+      </div>
+    </div>
+
     <div id="eventBox" class="card" hidden style="margin-top:18px">
       <h2 style="margin:0 0 4px;font-size:20px">📅 Lịch chiếu "Đêm phim"</h2>
       <p class="muted">Trong giờ chiếu, mọi người xem phim được nhân 🍿. Người bấm "Nhắc tôi" sẽ được báo trước 10 phút và lúc bắt đầu.</p>
@@ -146,14 +184,15 @@
       $('loginBtn').disabled = false; $('loginBtn').textContent = 'Đăng nhập';
       if (!j.ok) {
         sessionStorage.removeItem('rap.admin');
-        $('loginBox').hidden = false; $('listBox').hidden = true; $('eventBox').hidden = true; $('statsBox').hidden = true;
+        $('loginBox').hidden = false; $('listBox').hidden = true; $('eventBox').hidden = true; $('statsBox').hidden = true; $('secBox').hidden = true;
         $('loginErr').textContent = pw ? (j.error || 'Không đăng nhập được.') : (j.error && !/Sai mật khẩu/.test(j.error) ? j.error : '');
         return;
       }
       sessionStorage.setItem('rap.admin', pw);
-      $('loginBox').hidden = true; $('listBox').hidden = false; $('eventBox').hidden = false; $('statsBox').hidden = false;
+      $('loginBox').hidden = true; $('listBox').hidden = false; $('eventBox').hidden = false; $('statsBox').hidden = false; $('secBox').hidden = false;
       loadEvents();
       loadStats();
+      loadSecurity();
       $('warn').hidden = j.supportEnabled;
       const list = j.requests.filter((x) => filter === 'all' || x.status === 'pending');
       const tb = $('rows');
@@ -338,6 +377,67 @@
       });
       if (ok) { $('evTitle').value = ''; $('evDesc').value = ''; }
     };
+
+    // ---- 🛡️ An ninh ----
+    const fmtTime = (t) => { const v = new Date(t + 7 * 3600000).toISOString(); return `${v.slice(11, 16)} ${v.slice(8, 10)}/${v.slice(5, 7)}`; };
+    async function secApi(url, body) {
+      const r = await fetch(url, body ? { method: 'POST', headers: { 'Content-Type': 'application/json', 'X-Admin-Password': encodeURIComponent(pw) }, body: JSON.stringify(body) } : { headers: { 'X-Admin-Password': encodeURIComponent(pw) }, cache: 'no-store' });
+      const j = await r.json().catch(() => ({}));
+      $('secErr').textContent = j.ok ? '' : (j.error || 'Có lỗi.');
+      if (j.ok) renderSecurity(j);
+      return j.ok;
+    }
+    const loadSecurity = () => secApi('/api/admin/security');
+    const banIp = (ip, ban, minutes, alsoAccounts) => secApi('/api/admin/ban-ip', { ip, ban, minutes, alsoAccounts, reason: 'Chủ rạp chặn' });
+    const banUser = (username, ban) => secApi('/api/admin/ban-user', { username, ban, reason: 'Chủ rạp khoá' });
+    function renderSecurity(j) {
+      const tiles = $('secTiles'); tiles.innerHTML = '';
+      const tile = (v, label) => { const d = el('div', 'tile'); d.append(el('b', null, String(v)), el('span', null, label)); tiles.appendChild(d); };
+      tile(j.recentSignups, 'tài khoản mới trong 1 giờ qua');
+      tile(j.bans.length, 'IP đang bị chặn');
+      tile(j.bannedUsers.length, 'tài khoản bị khoá');
+      tile(j.turnstile ? 'Bật' : 'Tắt', 'chống bot khi đăng ký');
+      $('secRule').textContent = `Đang áp dụng: tài khoản phải tạo được ${j.voteRule.minAge} phút và xem phim đủ ${j.voteRule.minWatch} phút mới được vote · mỗi IP tối đa ${j.voteRule.perIp} phiếu cho một video · mỗi IP tối đa ${j.limits.wsPerIp} kết nối và ${j.limits.httpPerMin} lượt tải mỗi phút (vượt nhiều lần tự bị chặn ${j.limits.autoBanMinutes} phút).`;
+      const tb = $('secGroups'); tb.innerHTML = '';
+      if (!j.groups.length) { const tr = el('tr'); const td = el('td', 'empty', 'Chưa thấy IP nào tạo nhiều tài khoản.'); td.colSpan = 5; tr.appendChild(td); tb.appendChild(tr); }
+      for (const g of j.groups) {
+        const tr = el('tr');
+        const ipTd = el('td', 'ipcell', g.ip); if (g.blocked) ipTd.appendChild(el('span', 'tag red', 'đang chặn'));
+        const accTd = el('td');
+        const det = el('details', 'acc'); det.appendChild(el('summary', null, `${g.count} tài khoản`));
+        const t = el('table'); const body = el('tbody');
+        for (const a of g.accounts) {
+          const r = el('tr');
+          const n = el('td', null, `${a.name} (${a.username})`); if (a.banned) n.appendChild(el('span', 'tag red', 'đã khoá'));
+          const info = el('td', null, `tạo ${fmtTime(a.createdAt)} · xem ${a.watched} phút · ${a.points} 🍿`);
+          const act = el('td'); const b = el('button', 'small ' + (a.banned ? 'no' : 'danger'), a.banned ? 'Mở khoá' : 'Khoá');
+          b.onclick = () => banUser(a.username, !a.banned); act.appendChild(b);
+          r.append(n, info, act); body.appendChild(r);
+        }
+        t.appendChild(body); det.appendChild(t); accTd.appendChild(det);
+        const h24 = el('td', null, String(g.last24h)); if (g.last24h >= 3) h24.appendChild(el('span', 'tag hot', 'đáng ngờ'));
+        const on = el('td', null, String(g.online));
+        const act = el('td');
+        const b = el('button', 'small ' + (g.blocked ? 'no' : 'danger'), g.blocked ? 'Bỏ chặn' : 'Chặn + khoá TK');
+        b.onclick = () => { if (g.blocked) banIp(g.ip, false); else if (confirm(`Chặn IP ${g.ip} trong 1 ngày và khoá ${g.count} tài khoản tạo từ IP này?`)) banIp(g.ip, true, 1440, true); };
+        act.appendChild(b);
+        tr.append(ipTd, accTd, h24, on, act); tb.appendChild(tr);
+      }
+      const bb = $('secBans'); bb.innerHTML = '';
+      const rows = j.bans.map((b) => ({ label: b.ip, ip: true, kind: b.kind, reason: b.kind === 'env' ? 'Biến BLOCK_IPS trên Render' : b.kind === 'auto' ? 'Tự chặn: ' + (b.reason || '') : (b.reason || ''), until: b.until, key: b.ip }))
+        .concat(j.bannedUsers.map((u) => ({ label: `${u.name} (${u.username})`, ip: false, reason: u.reason || '', until: u.until, key: u.username })));
+      if (!rows.length) { const tr = el('tr'); const td = el('td', 'empty', 'Không có ai bị chặn.'); td.colSpan = 4; tr.appendChild(td); bb.appendChild(tr); }
+      for (const r of rows) {
+        const tr = el('tr');
+        tr.append(el('td', r.ip ? 'ipcell' : null, r.label), el('td', null, r.reason), el('td', null, r.until ? fmtTime(r.until) : 'Vĩnh viễn'));
+        const act = el('td');
+        if (r.kind !== 'env') { const b = el('button', 'small no', r.ip ? 'Bỏ chặn' : 'Mở khoá'); b.onclick = () => (r.ip ? banIp(r.key, false) : banUser(r.key, false)); act.appendChild(b); }
+        tr.appendChild(act); bb.appendChild(tr);
+      }
+    }
+    $('secReload').onclick = loadSecurity;
+    $('secBan').onclick = () => { const ip = $('secIp').value.trim(); if (!ip) { $('secErr').textContent = 'Bạn nhập IP cần chặn.'; return; } banIp(ip, true, Number($('secDur').value), $('secAlso').checked).then((ok) => { if (ok) $('secIp').value = ''; }); };
+    $('secBanUser').onclick = () => { const u = $('secUser').value.trim().toLowerCase(); if (!u) { $('secErr').textContent = 'Bạn nhập tên đăng nhập cần khoá.'; return; } if (confirm(`Khoá tài khoản "${u}"?`)) banUser(u, true).then((ok) => { if (ok) $('secUser').value = ''; }); };
 
     function tryLogin() {
       pw = $('pw').value.trim();
