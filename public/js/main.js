@@ -132,7 +132,7 @@ function applyPrefs() {
   player.setCaptions(state.prefs.captions);
   $('optQuality').textContent = state.prefs.quality === 'high' ? '✨ Độ nét: Cao (bấm để chuyển Mượt)' : '⚡ Độ nét: Mượt (bấm để chuyển Cao)';
   $('laserBtn').classList.toggle('dim', !state.prefs.lasers);
-  $('laserBtn').title = state.prefs.lasers ? 'Tắt hiệu ứng laser trên máy bạn' : 'Bật hiệu ứng laser trên máy bạn';
+  $('laserBtn').title = state.prefs.lasers ? 'Tắt laser và đèn chớp trên máy bạn' : 'Bật laser và đèn chớp trên máy bạn';
   $('ccBtn').classList.toggle('on', state.prefs.captions);
   $('ccBtn').classList.toggle('dim', !state.prefs.captions);
   $('ccBtn').title = state.prefs.captions ? 'Tắt phụ đề video (chỉ trên máy bạn)' : 'Bật phụ đề video (chỉ trên máy bạn)';
@@ -1146,7 +1146,7 @@ $('laserBtn').onclick = () => {
   store.set('lasers', state.prefs.lasers);
   applyPrefs();
   renderParty();
-  toast(state.prefs.lasers ? 'Đã bật hiệu ứng laser' : 'Đã tắt hiệu ứng laser trên máy bạn');
+  toast(state.prefs.lasers ? '⚡ Đã bật laser và đèn chớp' : 'Đã tắt laser và đèn chớp trên máy bạn');
 };
 $('ccBtn').onclick = () => {
   state.prefs.captions = !state.prefs.captions;
