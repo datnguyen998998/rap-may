@@ -180,6 +180,11 @@ export class Theater {
 
     this.resize();
     window.addEventListener('resize', () => this.resize());
+    // Điện thoại: khung chứa có thể đổi cỡ mà cửa sổ không phát sự kiện resize
+    // (thanh địa chỉ ẩn/hiện, xoay máy, lúc trang vừa tải) → tự đo lại để khung 3D luôn vừa màn hình
+    window.addEventListener('orientationchange', () => setTimeout(() => this.resize(), 300));
+    window.visualViewport?.addEventListener('resize', () => this.resize());
+    if (window.ResizeObserver) new ResizeObserver(() => this.resize()).observe(this.container);
     this.renderer.setAnimationLoop(() => this.frame());
   }
 
@@ -835,6 +840,8 @@ export class Theater {
 
   // vào rạp: góc nhìn mặc định là toàn cảnh
   enterRoom(seat) {
+    this.resize();
+    this.yaw = 0; this.pitch = 0;
     this.mySeat = seat;
     this.setView('overview');
   }
@@ -1440,7 +1447,11 @@ export class Theater {
 
   // ------------------------------------------------------------ VÒNG LẶP
   resize() {
-    const w = this.container.clientWidth, h = this.container.clientHeight;
+    // lấy kích thước khung chứa, nhưng không bao giờ lớn hơn cửa sổ (tránh khung 3D to gấp nhiều lần màn hình)
+    let w = this.container.clientWidth || window.innerWidth;
+    let h = this.container.clientHeight || window.innerHeight;
+    w = Math.min(w, window.innerWidth || w); h = Math.min(h, window.innerHeight || h);
+    if (!w || !h) return;
     this.camera.aspect = w / h;
     this.applyFov();
     this.renderer.setSize(w, h);
@@ -1467,6 +1478,13 @@ export class Theater {
   frame() {
     const dt = Math.min(this.clock.getDelta(), 0.1);
     const t = this.clock.elapsedTime;
+    // mỗi giây kiểm tra 1 lần: khung 3D lệch cỡ so với khung chứa thì đo lại
+    if (t - (this.sizeCheckAt || 0) > 1) {
+      this.sizeCheckAt = t;
+      const el = this.renderer.domElement;
+      const cw = Math.min(this.container.clientWidth, window.innerWidth), ch = Math.min(this.container.clientHeight, window.innerHeight);
+      if (cw && ch && (Math.abs(el.clientWidth - cw) > 2 || Math.abs(el.clientHeight - ch) > 2)) this.resize();
+    }
     this.updateCamera(dt);
     this.updateDisco(t, dt);
     this.updateWalkers(dt);
