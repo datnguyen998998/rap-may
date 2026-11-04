@@ -1017,3 +1017,112 @@ body.hud-idle #topbar .top-act { opacity: 1; }
   .hud-now-playing { max-width: 240px; }
   #reactBar .act { padding: 4px 6px; font-size: 13px; }
 }
+
+/* =====================================================================
+   SỬA LỖI: menu "Tuỳ chọn rạp" khi cầm điện thoại dọc
+   (trước đây bị quy tắc của máy tính đẩy xuống dưới đáy màn hình)
+   ===================================================================== */
+@media (max-width: 760px) {
+  #topbar { z-index: 9; } /* menu thả xuống nằm trên khung đang chiếu và menu phải */
+  .menu-wrap .popover.drop {
+    position: fixed; top: 46px; bottom: auto; left: auto; right: 8px;
+    width: min(290px, calc(100vw - 16px)); min-width: 0;
+    max-height: calc(100vh - 120px); overflow-y: auto;
+  }
+  .menu-wrap .popover.drop button { padding: 9px 12px; font-size: 13.5px; white-space: normal; }
+}
+
+/* =====================================================================
+   ĐIỆN THOẠI XOAY NGANG (màn hình thấp)
+   Hàng dưới cùng: góc nhìn | ô chat | âm thanh. Trên nó: thả cảm xúc.
+   Menu phải dọc mép phải, chỉ biểu tượng. Khối "đang chiếu" gọn ở góc trên trái.
+   ===================================================================== */
+@media (max-height: 500px) and (orientation: landscape) {
+  :root { --dock-w: 44px; }
+
+  /* thanh trên */
+  #topbar { padding: 4px 8px; min-height: 0; gap: 8px; z-index: 9; }
+  .top-left, .top-right { gap: 5px; }
+  .brand span { display: none; }
+  .brand img { width: 24px; height: 24px; }
+  .chip { font-size: 11.5px; padding: 4px 9px; }
+  .top-act { width: 30px; height: 30px; padding: 0; justify-content: center; border-radius: 50%; }
+  .top-act span { display: none; }
+  .top-act svg { width: 15px; height: 15px; }
+  .round-btn, #profileBtn { width: 30px; height: 30px; }
+  #profileBtn { font-size: 13px; border-width: 2px; }
+  .round-btn svg { width: 15px; height: 15px; }
+  .menu-wrap .popover.drop { position: fixed; top: 42px; right: 8px; left: auto; bottom: auto; max-height: calc(100vh - 54px); overflow-y: auto; min-width: 250px; }
+  .menu-wrap .popover.drop button { padding: 8px 12px; font-size: 13px; }
+
+  /* đang chiếu: gọn như bản dọc */
+  .hud-now-playing { top: 42px; left: 10px; right: auto; max-width: 300px; }
+  .hud-now-playing::before { inset: -10px -14px -10px -10px; }
+  .hud-now-playing .eyebrow { display: none; }
+  #npPanel.replay .eyebrow { display: block; font-size: 9px; letter-spacing: .1em; }
+  .hud-now-playing h1 { font-size: 13.5px; font-weight: 600; line-height: 1.3; margin: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .hud-now-playing p { font-size: 11px; font-weight: 400; margin-top: 2px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  #npBar { height: 2px; margin-top: 5px; max-width: 220px; }
+  .heat-wrap { max-width: 220px; }
+  .heat-wrap canvas { height: 18px; }
+  .event-banner { font-size: 10.5px; padding: 4px 9px; margin-bottom: 5px; max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .change-track-button, .skip-poll, .poll-new { display: inline-flex; vertical-align: middle; margin: 6px 4px 0 0; }
+  .change-track-button.hidden, .skip-poll.hidden, .poll-new.hidden { display: none; }
+  .change-track-button, .skip-vote-button, .poll-new {
+    height: 26px; min-height: 0; padding: 0 9px; gap: 5px; border-radius: 999px;
+    font-size: 11px; font-weight: 600; align-items: center; white-space: nowrap;
+  }
+  .change-track-button svg, .skip-vote-button svg { width: 12px; height: 12px; }
+  .skip-poll { max-width: none; gap: 0; }
+  .skip-vote-button b { font-size: 11px; margin-left: 2px; }
+  .skip-vote-status, .skip-poll progress { display: none; }
+  #discoTag { font-size: 10.5px; margin-top: 6px; }
+  #discoTag svg { width: 12px; height: 12px; }
+  .poll-card { max-width: 280px; padding: 9px 11px; margin-top: 6px; max-height: calc(100vh - 210px); overflow-y: auto; }
+  .poll-q { font-size: 13px; }
+
+  /* menu phải: dọc mép phải, chỉ biểu tượng, cuộn được nếu không đủ chỗ */
+  #dock { right: 6px; top: 42px; bottom: 50px; transform: none; max-height: none; padding: 3px; border-radius: 14px; gap: 2px; }
+  .dock-collapse { width: 30px; height: 30px; margin-bottom: 1px; }
+  .dock-collapse svg { width: 15px; height: 15px; }
+  .dock-items { gap: 0; }
+  .dock-items button { padding: 6px 0; gap: 0; border-radius: 10px; }
+  .dock-items button span { display: none; }
+  .dock-items svg { width: 17px; height: 17px; stroke-width: 1.7; }
+  .dock-items .badge { top: 0; right: 0; min-width: 14px; height: 14px; font-size: 9px; padding: 0 4px; }
+
+  /* hàng dưới cùng: góc nhìn | ô chat | âm thanh */
+  #viewBar { left: 6px; bottom: 6px; padding: 3px; gap: 1px; border-radius: 12px; }
+  #viewBar button { width: 30px; height: 30px; border-radius: 8px; }
+  #viewBar svg { width: 16px; height: 16px; stroke-width: 1.8; }
+  #viewBar .rooms-btn { width: 30px; padding: 0; justify-content: center; }
+  #viewBar .rooms-btn span { display: none; }
+  #viewBar .bar-sep { height: 18px; margin: 0 1px; }
+  #soundBar { right: 6px; left: auto; bottom: 6px; padding: 3px; gap: 1px; border-radius: 12px; }
+  #soundBar button { width: 30px; height: 30px; }
+  #soundBar svg { width: 16px; height: 16px; stroke-width: 1.8; }
+  #volume { display: none; }
+  .quick-chat { left: 196px; right: 196px; bottom: 6px; width: auto; min-width: 0; transform: none; padding: 3px; border-radius: 12px; }
+  .quick-chat input { font-size: 13.5px; padding: 5px 4px; }
+  .emoji-trigger, #chatSend { width: 30px; height: 30px; border-radius: 9px; }
+  #chatCount { display: none; }
+
+  /* thả cảm xúc: ngay trên hàng dưới, bên trái */
+  #reactBar { left: 6px; bottom: 48px; padding: 3px; gap: 2px; border-radius: 12px; }
+  #emojiBar { display: flex; }
+  #emojiBar button { font-size: 17px; padding: 2px 3px; }
+  #emojiBar button:nth-child(n+4) { display: none; }
+  #reactBar .act { padding: 4px 7px; font-size: 13px; border-radius: 8px; font-weight: 500; }
+  #reactBar .act span { display: none; }
+  #reactBar .act.throw { font-size: 13px; padding: 4px 6px; }
+
+  /* ngăn chat / hàng chờ */
+  #drawer { top: 42px; bottom: 48px; right: calc(var(--dock-w) + 14px); width: 330px; left: auto; height: auto; border-radius: 16px; }
+  .drawer-head { padding: 10px 12px 6px; }
+  .drawer-head h2 { font-size: 17px; }
+  #chatLog { font-size: 14px; }
+
+  #hint, #seatTip { display: none; }
+  #soundBtn { bottom: 92px; }
+  .pin-bar { top: 44px; max-width: 46vw; font-size: 12px; }
+}
