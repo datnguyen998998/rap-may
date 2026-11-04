@@ -249,6 +249,36 @@ function renderAccount() {
   pb.style.setProperty('--avatar', CHARACTER_INFO[acc.character]?.color || '#555');
 }
 
+// ---- Cloudflare Turnstile: ô "Tôi không phải robot" khi tạo tài khoản (chỉ bật khi chủ rạp đặt khoá) ----
+let tsWidget = null;
+let tsToken = '';
+function ensureTurnstile() {
+  if (!state.turnstileKey) return;
+  $('tsBox').classList.remove('hidden');
+  const render = () => {
+    if (tsWidget !== null || !window.turnstile) return;
+    tsWidget = window.turnstile.render('#tsBox', {
+      sitekey: state.turnstileKey, theme: 'dark', language: 'vi',
+      callback: (t) => { tsToken = t; },
+      'expired-callback': () => { tsToken = ''; },
+      'error-callback': () => { tsToken = ''; },
+    });
+  };
+  if (window.turnstile) return render();
+  if (!document.getElementById('tsScript')) {
+    const sc = document.createElement('script');
+    sc.id = 'tsScript';
+    sc.src = 'https://challenges.cloudflare.com/turnstile/v0/api.js?render=explicit';
+    sc.async = true;
+    sc.onload = render;
+    document.head.appendChild(sc);
+  }
+}
+function resetTurnstile() {
+  tsToken = '';
+  try { if (tsWidget !== null && window.turnstile) window.turnstile.reset(tsWidget); } catch { /* bỏ qua */ }
+}
+
 function showAuth(mode = 'login') {
   $('authBox').classList.remove('hidden');
   $('lobbyBox').classList.add('hidden');
@@ -256,6 +286,7 @@ function showAuth(mode = 'login') {
   $('loginForm').classList.toggle('hidden', mode !== 'login');
   $('signupForm').classList.toggle('hidden', mode !== 'signup');
   $('authMsg').textContent = '';
+  if (mode === 'signup') ensureTurnstile();
 }
 function showLobby() {
   $('authBox').classList.add('hidden');
@@ -305,13 +336,16 @@ $('signupForm').addEventListener('submit', async (e) => {
   if ($('suPass').value !== $('suPass2').value) { msg.textContent = 'Hai lần nhập mật khẩu chưa khớp.'; return; }
   if (!$('suName').value.trim()) { msg.textContent = 'Bạn nhập biệt danh nhé!'; return; }
   if (!$('suAgree').checked) { msg.textContent = 'Bạn cần đồng ý với nội quy rạp.'; return; }
+  if (state.turnstileKey && !tsToken) { msg.textContent = 'Bạn đợi ô xác minh bên dưới hiện dấu ✓ rồi bấm lại nhé.'; ensureTurnstile(); return; }
   const btn = e.target.querySelector('button[type=submit]');
   btn.disabled = true;
   const res = await api('/api/auth/signup', {
     username, password: $('suPass').value, displayName: $('suName').value.trim(), character: state.character, agree: true,
     invite: store.get('invite', '') || undefined,
+    turnstile: tsToken || undefined,
   });
   btn.disabled = false;
+  if (state.turnstileKey) resetTurnstile(); // mỗi mã chỉ dùng được 1 lần
   if (!res.ok) { msg.textContent = res.error; return; }
   $('suPass').value = $('suPass2').value = '';
   const invited = res.account.invitedBy;
@@ -729,7 +763,7 @@ function renderSkip(skip) {
   $('skipBtn').setAttribute('aria-pressed', mine);
   $('skipBtn').title = mine ? 'Rút phiếu bỏ qua' : 'Bình chọn bỏ qua video đang chiếu';
   const st = $('skipStatus');
-  st.textContent = `${skip.count}/${skip.online ?? '?'} người thật đồng ý · ${skip.percent ?? 0}%`;
+  st.textContent = `${skip.count}/${skip.online ?? '?'} người được vote đồng ý · ${skip.percent ?? 0}%`;
   st.appendChild(document.createElement('br'));
   st.appendChild(document.createTextNode(`Cần trên ${skip.threshold ?? 35}% (${skip.needed} phiếu) thì chuyển bài`));
   $('skipProgress').max = Math.max(1, skip.needed);
@@ -2687,10 +2721,14 @@ $('hostUnpin').onclick = async () => { const r = await net.request('host-pin', '
 setInterval(() => { if (state.drawer === 'host') renderHost(); }, 3000);
 net.on('chat-state', (c) => setChatState(c));
 net.on('chat-blocked', ({ reason }) => toast(reason, 5000));
+// thông báo riêng từ máy chủ (vd: tài khoản mới chưa được vote)
+net.on('notice', ({ text }) => toast(text, 6000));
 
 // ---------------- SỰ KIỆN TỪ SERVER ----------------
 net.on('hello', async (d) => {
   if (d.catalog) { state.catalog = d.catalog; setTiers(d.catalog.tiers); }
+  state.turnstileKey = d.turnstileSiteKey || null;
+  if (state.turnstileKey && !$('signupForm').classList.contains('hidden')) ensureTurnstile();
   if (d.emojiGroups) { state.emojiGroups = d.emojiGroups; buildEmojiPanel(); }
   if (d.quickEmojis) { state.quickEmojis = d.quickEmojis; buildEmojiBar(); }
   if (d.postSeconds) state.postSeconds = d.postSeconds;
