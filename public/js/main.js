@@ -723,13 +723,15 @@ function renderSkip(skip) {
   state.skip = skip;
   const mine = !!(state.me && skip.voters.includes(state.me.id));
   $('skipCount').textContent = `${skip.count}/${skip.needed}`;
+  // luôn cho thấy rạp đang tính bao nhiêu người thật (bot không tính), kể cả trên điện thoại
+  $('skipOnline').textContent = skip.online != null ? `· ${skip.online} người` : '';
   $('skipLabel').textContent = mine ? 'Rút phiếu skip' : 'Vote bỏ qua';
   $('skipBtn').setAttribute('aria-pressed', mine);
   $('skipBtn').title = mine ? 'Rút phiếu bỏ qua' : 'Bình chọn bỏ qua video đang chiếu';
   const st = $('skipStatus');
   st.textContent = `${skip.count}/${skip.online ?? '?'} người thật đồng ý · ${skip.percent ?? 0}%`;
   st.appendChild(document.createElement('br'));
-  st.appendChild(document.createTextNode(`Đủ ${skip.threshold ?? 35}% thì chuyển bài`));
+  st.appendChild(document.createTextNode(`Cần trên ${skip.threshold ?? 35}% (${skip.needed} phiếu) thì chuyển bài`));
   $('skipProgress').max = Math.max(1, skip.needed);
   $('skipProgress').value = skip.count;
 }
