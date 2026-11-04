@@ -26,7 +26,7 @@ const PORT = parseInt(process.env.PORT, 10) || 3000;
 const TOTAL_SEATS = 100;              // 10 hàng (A–J) x 10 ghế
 const MAX_QUEUE_PER_USER = 5;         // mỗi người có tối đa 5 video trong hàng chờ
 const CHAT_MAX = 160;                 // tin nhắn tối đa 160 ký tự
-const SKIP_PERCENT = 35;              // đủ 35% số người thật đồng ý thì bỏ qua video
+const SKIP_PERCENT = 35;              // TRÊN 35% số người thật trong phòng đồng ý thì bỏ qua video (3 người cần 2 phiếu, 10 người cần 4)
 const MAX_VIDEO_MINUTES = 240;        // video dài hơn 4 tiếng sẽ bị bỏ qua
 const START_DELAY_MS = 2000;          // chờ 2 giây cho mọi người tải video rồi mới chạy
 const VOTE_SECONDS = 15;              // thời gian vòng bình chọn video tiếp theo
@@ -359,8 +359,10 @@ function createRoom({ id, name, isMain = false, ownerUsername = null, ownerName 
       byId: q.byId, byName: q.byName, votes: q.voters.size, voters: [...q.voters],
     }));
   }
+  // Số phiếu cần: phải TRÊN 35% số người thật đang ở trong phòng (bot không tính).
+  // 1 người → 1 · 2 người → 1 (50%) · 3 người → 2 · 10 người → 4 · 20 người → 8
   function skipNeeded() {
-    return Math.max(1, Math.ceil((humans().length * SKIP_PERCENT) / 100));
+    return Math.floor((humans().length * SKIP_PERCENT) / 100) + 1;
   }
   function skipPayload() {
     const online = humans().length;
