@@ -1438,7 +1438,9 @@ function adminPassFrom(req) {
 }
 function adminOk(req, res, ip) {
   const key = 'adminfail:' + ip;
-  if (accounts.peekLimited(key, 10)) {
+  // ngoài giới hạn theo IP, còn giới hạn chung: tổng 30 lần sai / 10 phút thì tạm khoá trang quản trị
+  // (để kẻ xấu đổi nhiều IP cũng không dò được mật khẩu)
+  if (accounts.peekLimited(key, 10) || accounts.peekLimited('adminfail:all', 30)) {
     json(res, 429, { ok: false, error: 'Bạn nhập sai mật khẩu nhiều lần quá. Đợi 10 phút rồi thử lại nhé.' });
     return false;
   }
@@ -1448,7 +1450,7 @@ function adminOk(req, res, ip) {
   }
   const given = adminPassFrom(req);
   if (!support.checkAdmin(given)) {
-    if (given.trim()) accounts.limited(key, 10, 600000); // ô trống không tính là nhập sai
+    if (given.trim()) { accounts.limited(key, 10, 600000); accounts.limited('adminfail:all', 30, 600000); } // ô trống không tính là nhập sai
     json(res, 401, { ok: false, error: 'Sai mật khẩu quản trị.' });
     return false;
   }
@@ -1506,11 +1508,12 @@ async function handleApi(req, res, urlPath) {
 
   if (urlPath === '/api/auth/login') {
     const uname = String(body.username || '').toLowerCase();
-    if (accounts.limited('login:' + ip, 20, 900000) || accounts.limited('login:' + ip + ':' + uname, 8, 900000)) {
+    if (accounts.limited('login:' + ip, 20, 900000) || accounts.limited('login:' + ip + ':' + uname, 8, 900000)
+      || accounts.peekLimited('loginfail:' + uname, 15)) { // tài khoản này bị nhập sai 15 lần (từ bất kỳ IP nào)
       return json(res, 429, { ok: false, error: 'Bạn thử sai nhiều lần quá, đợi 15 phút rồi thử lại nhé.' });
     }
     const r = accounts.login(body.username, body.password);
-    if (r.error) return json(res, 401, { ok: false, error: r.error });
+    if (r.error) { if (uname) accounts.limited('loginfail:' + uname, 15, 900000); return json(res, 401, { ok: false, error: r.error }); }
     const t = accounts.createSession(r.account.username);
     res.setHeader('Set-Cookie', accounts.sessionCookie(req, t));
     return json(res, 200, { ok: true, account: accounts.publicAccount(r.account) });
