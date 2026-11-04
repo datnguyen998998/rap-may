@@ -175,6 +175,7 @@ export class Theater {
     this.buildSeats();
     this.buildScreen(screenElement);
     this.buildDisco();
+    this.buildStrobe();
     this.decor = buildDecor(this.scene); // loa, đèn rọi, tấm tiêu âm, LED sân khấu
     this.setupInput();
 
@@ -634,6 +635,8 @@ export class Theater {
       if (party) l.color.copy(PARTY_HUES[(bar + i * 2) % PARTY_HUES.length]);
     });
     this.updateLasers(t, party, pulse, beats, heat);
+    // đèn chớp cả phòng: chỉ khi video ở chế độ Sôi động, và người xem chưa tắt hiệu ứng (nút ⚡)
+    this.updateStrobe(videoParty && this.laserPref !== false, beats, pulse, bpm);
     this.updatePyro(now, dt || 0.016);
   }
 
@@ -677,6 +680,74 @@ export class Theater {
 
   // Laser bật khi đang quẩy (người xem có thể tắt bằng nút ⚡)
   setLasers(on) { this.laserPref = on; }
+  // ------------------------------------------------------------ ĐÈN CHỚP CẢ PHÒNG
+  // Chỉ chạy khi video được gửi ở chế độ "Sôi động". Gồm:
+  //  - ánh sáng màu phủ cả phòng, bùng nhẹ theo từng nhịp (đổi màu mỗi ô nhịp 4 phách)
+  //  - chớp trắng ngắn mỗi 2 nhịp (khoảng 1 lần/giây, đủ "nhẹ", không gây chói)
+  //  - dàn đèn chớp gắn trên tường hai bên và phía trên sân khấu, chạy đuổi theo nhịp
+  // Bấm nút ⚡ ở góc dưới để tắt trên máy mình (tắt cả laser lẫn đèn chớp).
+  buildStrobe() {
+    const s = this.scene;
+    this.strobeWash = new THREE.HemisphereLight(0xffffff, 0x1a0010, 0); // màu phủ cả phòng
+    this.strobeFlash = new THREE.AmbientLight(0xffffff, 0);             // chớp trắng
+    s.add(this.strobeWash, this.strobeFlash);
+    const glowTex = this.glowTexture();
+    const bodyGeo = new THREE.BoxGeometry(1.1, 0.22, 0.22);
+    const lensGeo = new THREE.PlaneGeometry(0.95, 0.12);
+    const bodyMat = new THREE.MeshStandardMaterial({ color: 0x15151a, roughness: 0.5, metalness: 0.6 });
+    this.strobeUnits = [];
+    const add = (x, y, z, rotY) => {
+      const g = new THREE.Group();
+      g.position.set(x, y, z);
+      g.rotation.y = rotY;
+      const body = new THREE.Mesh(bodyGeo, bodyMat);
+      const lensMat = new THREE.MeshBasicMaterial({ color: 0x333333, toneMapped: false });
+      const lens = new THREE.Mesh(lensGeo, lensMat);
+      lens.position.z = 0.115;
+      const glow = new THREE.Sprite(new THREE.SpriteMaterial({ map: glowTex, color: 0xffffff, transparent: true, opacity: 0, blending: THREE.AdditiveBlending, depthWrite: false, toneMapped: false, fog: false }));
+      glow.scale.set(2.6, 1.6, 1);
+      glow.position.z = 0.3;
+      g.add(body, lens, glow);
+      s.add(g);
+      this.strobeUnits.push({ lensMat, glow });
+    };
+    // 2 bên tường (5 đèn mỗi bên), quay vào giữa phòng
+    for (const z of [-9, -4.5, 0, 4.5, 9]) { add(-11.2, 12.6, z, Math.PI / 2); add(11.2, 12.6, z, -Math.PI / 2); }
+    // phía trên sân khấu (4 đèn), quay ra khán giả
+    for (const x of [-7.5, -2.5, 2.5, 7.5]) add(x, 14.2, -13.4, 0);
+  }
+
+  updateStrobe(on, beats, pulse, bpm) {
+    const units = this.strobeUnits;
+    if (!on) {
+      if (this.strobeWash.intensity || this.strobeFlash.intensity) {
+        this.strobeWash.intensity = 0; this.strobeFlash.intensity = 0;
+        for (const u of units) { u.lensMat.color.setHex(0x333333); u.glow.material.opacity = 0; }
+      }
+      return;
+    }
+    const n = PARTY_HUES.length;
+    const hue = PARTY_HUES[Math.floor(beats / 4) % n];
+    // màu phủ cả phòng: bùng lên đầu mỗi nhịp rồi tắt dần (mềm, không giật)
+    this.strobeWash.color.copy(hue);
+    this.strobeWash.groundColor.copy(PARTY_HUES[(Math.floor(beats / 4) + 3) % n]).multiplyScalar(0.35);
+    this.strobeWash.intensity = 0.15 + 0.85 * pulse;
+    // chớp trắng ngắn: mỗi 2 nhịp (nhạc nhanh trên 150 BPM thì mỗi 4 nhịp) → khoảng 1 lần/giây
+    const every = bpm > 150 ? 4 : 2;
+    const flash = (beats % every) < 0.12;
+    this.strobeFlash.intensity = flash ? 1.1 : 0;
+    // dàn đèn: lúc chớp thì cùng loé trắng, còn lại chạy đuổi theo nhịp với màu của ô nhịp
+    const step = Math.floor(beats * 2);
+    units.forEach((u, i) => {
+      if (flash) { u.lensMat.color.setHex(0xffffff); u.glow.material.color.setHex(0xffffff); u.glow.material.opacity = 0.95; return; }
+      const lit = (step + i) % 4 === 0;
+      const c = PARTY_HUES[(Math.floor(beats / 4) + i) % n];
+      u.lensMat.color.copy(c).multiplyScalar(lit ? 1.4 : 0.35 + 0.4 * pulse);
+      u.glow.material.color.copy(c);
+      u.glow.material.opacity = lit ? 0.75 : 0.12 * pulse;
+    });
+  }
+
   setParty(on, bpm, startAt) {
     this.party = { on: !!on, bpm: bpm || 128, startAt: startAt || Date.now() };
   }
