@@ -1151,3 +1151,7 @@ body.hud-idle #topbar .top-act { opacity: 1; }
   .pin-bar { top: 44px; bottom: auto; left: 322px; right: calc(var(--dock-w) + 14px); transform: none; max-width: none; font-size: 12px; }
   body.drawer-open .pin-bar { right: calc(var(--dock-w) + 358px); }
 }
+
+/* số người thật đang được tính trong vote bỏ qua */
+.skip-online { font-size: 11px; font-weight: 500; opacity: .75; margin-left: 4px; white-space: nowrap; }
+@media (max-width: 760px), (max-height: 500px) and (orientation: landscape) { .skip-online { font-size: 10px; margin-left: 3px; } }
