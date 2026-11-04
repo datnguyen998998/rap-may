@@ -17,6 +17,7 @@ const engage = require('./lib/engage');
 const moments = require('./lib/moments');
 const polls = require('./lib/polls');
 const moderation = require('./lib/moderation');
+const guard = require('./lib/guard');
 const stats = require('./lib/stats');
 
 db.load();
@@ -26,6 +27,10 @@ const PORT = parseInt(process.env.PORT, 10) || 3000;
 const TOTAL_SEATS = 100;              // 10 hàng (A–J) x 10 ghế
 const MAX_QUEUE_PER_USER = 5;         // mỗi người có tối đa 5 video trong hàng chờ
 const CHAT_MAX = 160;                 // tin nhắn tối đa 160 ký tự
+// Chống tài khoản clone gian lận vote: tài khoản phải đủ "tuổi" và đã ngồi xem một lúc mới được vote
+const VOTE_MIN_AGE_MIN = process.env.VOTE_MIN_AGE_MIN != null ? Number(process.env.VOTE_MIN_AGE_MIN) : 30;   // tạo được ít nhất 30 phút
+const VOTE_MIN_WATCH_MIN = process.env.VOTE_MIN_WATCH_MIN != null ? Number(process.env.VOTE_MIN_WATCH_MIN) : 10; // đã xem phim ít nhất 10 phút
+const VOTES_PER_IP = Number(process.env.VOTES_PER_IP) || 2; // mỗi IP (một nhà / một wifi) tối đa 2 phiếu cho cùng một video
 const SKIP_PERCENT = 35;              // TRÊN 35% số người thật trong phòng đồng ý thì bỏ qua video (3 người cần 2 phiếu, 10 người cần 4)
 const MAX_VIDEO_MINUTES = 240;        // video dài hơn 4 tiếng sẽ bị bỏ qua
 const START_DELAY_MS = 2000;          // chờ 2 giây cho mọi người tải video rồi mới chạy
@@ -168,6 +173,29 @@ function effectiveOutfit(u) {
   const hat = u.gifts.find((g) => g.hat && g.until > Date.now());
   return hat ? { ...u.outfit, hat: hat.hat } : u.outfit;
 }
+// Lý do chưa được vote (null = được vote). Chủ rạp / chủ phòng luôn được vote.
+function voteBlock(u, hostOk) {
+  if (!u || u.bot) return 'no';
+  if (hostOk) return null;
+  const acc = accounts.getAccount(u.username);
+  if (!acc) return 'Bạn cần đăng nhập.';
+  const ageMin = (Date.now() - (acc.createdAt || 0)) / 60000;
+  const watched = Math.floor((acc.watchSeconds || 0) / 60);
+  if (ageMin >= VOTE_MIN_AGE_MIN && watched >= VOTE_MIN_WATCH_MIN) return null;
+  const need = [];
+  if (ageMin < VOTE_MIN_AGE_MIN) need.push(`còn ${Math.ceil(VOTE_MIN_AGE_MIN - ageMin)} phút nữa tài khoản mới đủ ${VOTE_MIN_AGE_MIN} phút tuổi`);
+  if (watched < VOTE_MIN_WATCH_MIN) need.push(`xem phim thêm ${VOTE_MIN_WATCH_MIN - watched} phút nữa (đã xem ${watched}/${VOTE_MIN_WATCH_MIN} phút)`);
+  return `🗳️ Tài khoản mới chưa được bình chọn để chống gian lận: ${need.join(' và ')}.`;
+}
+// Đếm số phiếu đến từ cùng một IP trong một nhóm người đã vote
+function sameIpVotes(voterIds, ip, usersMap) {
+  if (!ip) return 0;
+  let n = 0;
+  for (const id of voterIds) { const v = usersMap.get(id); if (v && v.ip === ip) n++; }
+  return n;
+}
+function notice(client, text) { if (client && client.ws) send(client.ws, 'notice', { text }); }
+
 function publicUser(u) {
   return {
     id: u.id, name: u.name, character: u.character, seat: u.seat, bot: !!u.bot, stage: u.stage || null,
@@ -361,14 +389,16 @@ function createRoom({ id, name, isMain = false, ownerUsername = null, ownerName 
   }
   // Số phiếu cần: phải TRÊN 35% số người thật đang ở trong phòng (bot không tính).
   // 1 người → 1 · 2 người → 1 (50%) · 3 người → 2 · 10 người → 4 · 20 người → 8
+  // chỉ tính những người được quyền vote (tài khoản đủ tuổi + đã xem đủ lâu), tài khoản clone mới tạo không làm tăng số phiếu cần
+  function voters() { return humans().filter((u) => !voteBlock(u, isHost(u))); }
   function skipNeeded() {
-    return Math.floor((humans().length * SKIP_PERCENT) / 100) + 1;
+    return Math.floor((voters().length * SKIP_PERCENT) / 100) + 1;
   }
   function skipPayload() {
-    const online = humans().length;
+    const online = voters().length;
     return {
       count: skipVotes.size, needed: skipNeeded(), voters: [...skipVotes],
-      online, percent: online ? Math.round((skipVotes.size / online) * 100) : 0, threshold: SKIP_PERCENT,
+      online, present: humans().length, percent: online ? Math.round((skipVotes.size / online) * 100) : 0, threshold: SKIP_PERCENT,
     };
   }
   function fullState() {
@@ -863,6 +893,11 @@ function createRoom({ id, name, isMain = false, ownerUsername = null, ownerName 
       if (!u || !item || rateLimited(client, 'vote', 250)) return;
       if (item.voters.has(u.id)) item.voters.delete(u.id);
       else {
+        const why = voteBlock(u, isHost(u));
+        if (why) return notice(client, why);
+        if (!isHost(u) && sameIpVotes(item.voters, u.ip, users) >= VOTES_PER_IP) {
+          return notice(client, `🗳️ Mạng của bạn đã có ${VOTES_PER_IP} phiếu cho video này rồi (mỗi wifi / mỗi nhà tối đa ${VOTES_PER_IP} phiếu).`);
+        }
         item.voters.add(u.id);
         trackFor(u, 'vote', 1, item.id);
         // 👍 cho video của người khác: tính vào bảng xếp hạng "được yêu thích" của người gửi
@@ -884,7 +919,15 @@ function createRoom({ id, name, isMain = false, ownerUsername = null, ownerName 
     skip(client) {
       const u = client.user;
       if (!u || !current || rateLimited(client, 'skip', 500)) return;
-      if (skipVotes.has(u.id)) skipVotes.delete(u.id); else skipVotes.add(u.id);
+      if (skipVotes.has(u.id)) skipVotes.delete(u.id);
+      else {
+        const why = voteBlock(u, isHost(u));
+        if (why) return notice(client, why);
+        if (!isHost(u) && sameIpVotes(skipVotes, u.ip, users) >= VOTES_PER_IP) {
+          return notice(client, `🗳️ Mạng của bạn đã có ${VOTES_PER_IP} phiếu bỏ qua rồi (mỗi wifi / mỗi nhà tối đa ${VOTES_PER_IP} phiếu).`);
+        }
+        skipVotes.add(u.id);
+      }
       checkSkip();
     },
 
@@ -1080,6 +1123,7 @@ function createRoom({ id, name, isMain = false, ownerUsername = null, ownerName 
       id: acc.id, username: acc.username, name: acc.displayName, character: acc.character,
       outfit: acc.outfit, tier: wardrobe.tierOf(acc.points), seat: bestSeat(free), stage: null, room,
       gifts: (liveGifts.get(acc.username) || []).filter((g) => g.until > Date.now()),
+      ip: client.ip || null, // chỉ dùng trên server để giới hạn số phiếu mỗi IP, không gửi cho ai
     };
     if (user.gifts.length) scheduleGiftExpiry(user);
     users.set(user.id, user);
@@ -1459,6 +1503,68 @@ function adminOk(req, res, ip) {
   return true;
 }
 
+// Đá một tài khoản ra khỏi rạp (mọi thiết bị) và xoá phiên đăng nhập
+function kickUser(username, reason) {
+  accounts.destroyUserSessions(username);
+  for (const c of clients.values()) {
+    if (c.username === username || (c.user && c.user.username === username)) {
+      if (c.room) c.room.leave(c, 'left');
+      send(c.ws, 'kicked', { reason });
+      setTimeout(() => { try { c.ws.close(4003); } catch { /* bỏ qua */ } }, 50);
+    }
+  }
+}
+// Dữ liệu cho mục 🛡️ An ninh ở trang quản trị
+function securityView() {
+  const now = Date.now();
+  const byIp = new Map();
+  for (const a of accounts.allAccounts()) {
+    if (!a.signupIp) continue;
+    if (!byIp.has(a.signupIp)) byIp.set(a.signupIp, []);
+    byIp.get(a.signupIp).push(a);
+  }
+  const online = new Map(); // ip -> số người đang trong rạp
+  for (const c of clients.values()) if (c.user && c.ip) online.set(c.ip, (online.get(c.ip) || 0) + 1);
+  const groups = [...byIp.entries()]
+    .filter(([, list]) => list.length >= 2)
+    .map(([gip, list]) => ({
+      ip: gip,
+      count: list.length,
+      last24h: list.filter((a) => now - a.createdAt < 86400000).length,
+      online: online.get(gip) || 0,
+      blocked: !!guard.blockedReason(gip),
+      accounts: list.sort((a, b) => b.createdAt - a.createdAt).slice(0, 50).map((a) => ({
+        username: a.username, name: a.displayName, createdAt: a.createdAt,
+        watched: Math.floor((a.watchSeconds || 0) / 60), points: a.points || 0, banned: !!guard.userBanned(a.username),
+      })),
+    }))
+    .sort((a, b) => b.last24h - a.last24h || b.count - a.count)
+    .slice(0, 60);
+  const sec = db.data.security || {};
+  const bannedUsers = Object.entries(sec.bannedUsers || {}).filter(([, b]) => !b.until || b.until > now).map(([username, b]) => ({ username, name: accounts.getAccount(username)?.displayName || username, ...b }));
+  const recent = accounts.allAccounts().filter((a) => now - a.createdAt < 3600000).length;
+  return { groups, bans: guard.listBans(), bannedUsers, recentSignups: recent, limits: guard.LIMITS, voteRule: { minAge: VOTE_MIN_AGE_MIN, minWatch: VOTE_MIN_WATCH_MIN, perIp: VOTES_PER_IP }, turnstile: !!(config.turnstileSiteKey && config.turnstileSecret) };
+}
+
+// Giới hạn tạo tài khoản theo IP (chỉ tính lần tạo thành công). Nhiều người dùng chung wifi/4G nên không siết quá.
+const SIGNUP_PER_IP_HOUR = Number(process.env.SIGNUP_PER_IP_HOUR) || 3;
+const SIGNUP_PER_IP_DAY = Number(process.env.SIGNUP_PER_IP_DAY) || 5;
+
+// Kiểm tra mã "Tôi không phải robot" của Cloudflare Turnstile ở phía máy chủ (bắt buộc, chỉ gắn ô trên trang là chưa đủ)
+async function verifyTurnstile(token, ip) {
+  if (!token || typeof token !== 'string' || token.length > 4096) return false;
+  try {
+    const form = new URLSearchParams({ secret: config.turnstileSecret, response: token });
+    if (ip && ip !== '?') form.set('remoteip', ip);
+    const r = await fetch('https://challenges.cloudflare.com/turnstile/v0/siteverify', { method: 'POST', body: form, signal: AbortSignal.timeout(8000) });
+    const d = await r.json();
+    return !!d.success;
+  } catch (e) {
+    console.error('Không kiểm tra được Turnstile:', e.message);
+    return false;
+  }
+}
+
 async function handleApi(req, res, urlPath) {
   const ip = accounts.clientIp(req);
   const token = accounts.tokenFromReq(req);
@@ -1481,6 +1587,11 @@ async function handleApi(req, res, urlPath) {
     if (!adminOk(req, res, ip)) return;
     return json(res, 200, { ok: true, events: engage.eventsView(null) });
   }
+  // ---- An ninh: soi tài khoản clone, khoá tài khoản, chặn IP ----
+  if (urlPath === '/api/admin/security' && req.method === 'GET') {
+    if (!adminOk(req, res, ip)) return;
+    return json(res, 200, { ok: true, ...securityView() });
+  }
   if (urlPath === '/api/admin/stats' && req.method === 'GET') {
     if (!adminOk(req, res, ip)) return;
     const days = Math.min(60, Math.max(7, Number(new URL(req.url, 'http://x').searchParams.get('days')) || 14));
@@ -1498,10 +1609,21 @@ async function handleApi(req, res, urlPath) {
 
   if (urlPath === '/api/auth/signup') {
     if (!body.agree) return json(res, 400, { ok: false, error: 'Bạn cần đồng ý với nội quy rạp.' });
-    if (accounts.limited('signup:' + ip, 20, 3600000)) return json(res, 429, { ok: false, error: 'Bạn tạo nhiều tài khoản quá, thử lại sau 1 giờ nhé.' });
+    if (accounts.peekLimited('signup:h:' + ip, SIGNUP_PER_IP_HOUR) || accounts.peekLimited('signup:d:' + ip, SIGNUP_PER_IP_DAY)) {
+      return json(res, 429, { ok: false, error: 'Mạng của bạn đã tạo nhiều tài khoản quá, thử lại sau nhé.' });
+    }
+    if (accounts.limited('signuptry:' + ip, 30, 3600000)) return json(res, 429, { ok: false, error: 'Bạn thử quá nhiều lần, đợi một lúc nhé.' });
+    if (config.turnstileSiteKey && config.turnstileSecret && !(await verifyTurnstile(body.turnstile, ip))) {
+      return json(res, 400, { ok: false, error: 'Xác minh "Tôi không phải robot" chưa đạt, bạn thử lại nhé.', turnstile: true });
+    }
     if (moderation.hasBad(String(body.displayName || '')) || moderation.hasBad(String(body.username || ''))) return json(res, 400, { ok: false, error: 'Tên có từ ngữ không phù hợp, chọn tên khác nhé.' });
     const r = accounts.createAccount(body, reservedNames());
     if (r.error) return json(res, 400, { ok: false, error: r.error });
+    accounts.limited('signup:h:' + ip, SIGNUP_PER_IP_HOUR, 3600000);
+    accounts.limited('signup:d:' + ip, SIGNUP_PER_IP_DAY, 86400000);
+    r.account.signupIp = ip; // để chủ rạp soi tài khoản clone (không hiện cho người khác)
+    r.account.lastIp = ip;
+    db.save();
     if (body.invite) applyInvite(r.account, body.invite);
     const t = accounts.createSession(r.account.username);
     res.setHeader('Set-Cookie', accounts.sessionCookie(req, t));
@@ -1516,6 +1638,9 @@ async function handleApi(req, res, urlPath) {
     }
     const r = accounts.login(body.username, body.password);
     if (r.error) { if (uname) accounts.limited('loginfail:' + uname, 15, 900000); return json(res, 401, { ok: false, error: r.error }); }
+    const ban = guard.userBanned(r.account.username);
+    if (ban) return json(res, 403, { ok: false, error: 'Tài khoản này đã bị chủ rạp khoá' + (ban.reason ? `: ${ban.reason}` : '.') });
+    r.account.lastIp = ip; db.save();
     const t = accounts.createSession(r.account.username);
     res.setHeader('Set-Cookie', accounts.sessionCookie(req, t));
     return json(res, 200, { ok: true, account: accounts.publicAccount(r.account) });
@@ -1546,6 +1671,36 @@ async function handleApi(req, res, urlPath) {
     }
     broadcastEvents();
     return json(res, 200, { ok: true, events: engage.eventsView(null) });
+  }
+
+  if (urlPath === '/api/admin/ban-user') {
+    if (!adminOk(req, res, ip)) return;
+    const username = String(body.username || '').toLowerCase();
+    if (!accounts.getAccount(username)) return json(res, 404, { ok: false, error: 'Không có tài khoản này.' });
+    if (body.ban) {
+      if (config.hostUsers.includes(username)) return json(res, 400, { ok: false, error: 'Không khoá được tài khoản chủ rạp.' });
+      guard.banUser(username, Number(body.minutes) || 0, body.reason);
+      kickUser(username, 'Tài khoản của bạn đã bị chủ rạp khoá.');
+    } else guard.unbanUser(username);
+    return json(res, 200, { ok: true, ...securityView() });
+  }
+  if (urlPath === '/api/admin/ban-ip') {
+    if (!adminOk(req, res, ip)) return;
+    const target = String(body.ip || '').trim();
+    if (!/^[0-9a-f:.]{3,45}$/i.test(target)) return json(res, 400, { ok: false, error: 'IP không hợp lệ.' });
+    if (target === ip) return json(res, 400, { ok: false, error: 'Đây là IP của chính bạn, không chặn được.' });
+    if (body.ban) {
+      guard.banIp(target, Number(body.minutes) || 0, body.reason, 'admin');
+      // khoá luôn các tài khoản tạo từ IP này (nếu chủ rạp chọn)
+      if (body.alsoAccounts) {
+        for (const a of accounts.allAccounts()) {
+          if (a.signupIp === target && !config.hostUsers.includes(a.username)) { guard.banUser(a.username, Number(body.minutes) || 0, 'Tạo từ IP bị chặn'); kickUser(a.username, 'Tài khoản của bạn đã bị chủ rạp khoá.'); }
+        }
+      }
+      // ngắt mọi kết nối đang mở từ IP này
+      for (const c of clients.values()) if (c.ip === target) { send(c.ws, 'kicked', { reason: 'Kết nối của bạn đã bị chặn.' }); setTimeout(() => { try { c.ws.close(4003); } catch { /* bỏ qua */ } }, 50); }
+    } else guard.unbanIp(target);
+    return json(res, 200, { ok: true, ...securityView() });
   }
 
   if (urlPath === '/api/admin/support/decide') {
@@ -1600,19 +1755,40 @@ async function handleApi(req, res, urlPath) {
 }
 
 // ---------------- CHIẾU ẢNH (nhận ảnh qua HTTP) ----------------
-function handlePostUpload(req, res) {
+function handlePostUpload(req, res, ip) {
   const token = req.headers['x-token'];
   const u = token && tokens.get(token);
-  if (!u || !u.room) return json(res, 401, { ok: false, error: 'Bạn cần vào rạp trước.' });
+  // Kiểm tra mọi điều kiện TRƯỚC khi đọc dữ liệu ảnh (không để kẻ phá gửi tệp nặng liên tục làm đầy bộ nhớ)
+  const deny = (code, error) => { res.setHeader('Connection', 'close'); json(res, code, { ok: false, error }); req.resume(); };
+  if (!u || !u.room) return deny(401, 'Bạn cần vào rạp trước.');
+  const maxBody = POST_MAX_BYTES * 1.4 + 4096;
+  const declared = Number(req.headers['content-length']);
+  if (!declared || declared > maxBody) return deny(413, 'Ảnh quá lớn.');
+  if (u.lastPost && Date.now() - u.lastPost < POST_COOLDOWN_MS) {
+    return deny(429, `Đợi ${Math.ceil((POST_COOLDOWN_MS - (Date.now() - u.lastPost)) / 1000)} giây nữa mới gửi được ảnh tiếp nhé.`);
+  }
+  if (u.room.postQueueFull()) return deny(429, 'Đang có nhiều ảnh chờ chiếu quá, thử lại sau nhé.');
+  const accPre = accounts.getAccount(u.username);
+  if (!accPre) return deny(401, 'Bạn cần đăng nhập.');
+  const minCost = wardrobe.postCost(POST_SECONDS[0]);
+  if ((accPre.balance || 0) < minCost) return deny(402, `Chiếu ${POST_SECONDS[0]} giây cần ${minCost} 🍿, bạn còn ${accPre.balance || 0} 🍿.`);
+  if (!guard.uploadBegin(ip)) return deny(429, 'Đang có nhiều ảnh được gửi cùng lúc, thử lại sau vài giây nhé.');
+  let done = false;
+  const release = () => { if (!done) { done = true; guard.uploadEnd(ip); } };
+  res.on('close', release);
+  // gửi quá chậm (giữ kết nối): ngắt sau 20 giây
+  req.setTimeout(20000, () => { release(); req.destroy(); });
   let size = 0;
   const chunks = [];
   let aborted = false;
   req.on('data', (c) => {
     size += c.length;
-    if (size > POST_MAX_BYTES * 1.4 + 4096) { aborted = true; req.destroy(); return; }
+    if (size > maxBody) { aborted = true; release(); guard.strike(ip, 'gửi ảnh vượt dung lượng'); req.destroy(); return; }
     chunks.push(c);
   });
+  req.on('error', release);
   req.on('end', () => {
+    release();
     if (aborted) return;
     let body;
     try { body = JSON.parse(Buffer.concat(chunks).toString()); } catch { return json(res, 400, { ok: false, error: 'Dữ liệu không hợp lệ.' }); }
@@ -1665,7 +1841,12 @@ const server = http.createServer((req, res) => {
     res.writeHead(400); return res.end('Bad request');
   }
   if (urlPath === '/healthz') { res.writeHead(200); return res.end('ok'); }
-  if (urlPath === '/api/screen-post' && req.method === 'POST') return handlePostUpload(req, res);
+  // chống phá hoại: IP bị chặn / gửi quá nhiều request
+  const reqIp = accounts.clientIp(req);
+  const blocked = guard.blockedReason(reqIp);
+  if (blocked) { res.writeHead(403, { 'Content-Type': 'text/plain; charset=utf-8' }); return res.end(blocked); }
+  if (!guard.httpAllow(reqIp)) { res.writeHead(429, { 'Content-Type': 'text/plain; charset=utf-8', 'Retry-After': '60' }); return res.end('Bạn tải trang quá nhiều lần, đợi 1 phút nhé.'); }
+  if (urlPath === '/api/screen-post' && req.method === 'POST') return handlePostUpload(req, res, reqIp);
   if (urlPath.startsWith('/api/auth/') || urlPath === '/api/profile' || urlPath === '/api/invite' || urlPath.startsWith('/api/support') || urlPath.startsWith('/api/admin/')) {
     return handleApi(req, res, urlPath).catch((e) => { console.error(e); json(res, 500, { ok: false, error: 'Lỗi máy chủ.' }); });
   }
@@ -1702,6 +1883,7 @@ const handlers = {
   join(client, d, reply) {
     const acc = client.username && accounts.getAccount(client.username);
     if (!acc) return reply({ ok: false, error: 'Bạn cần đăng nhập trước.', needLogin: true });
+    if (guard.userBanned(acc.username)) return reply({ ok: false, error: 'Tài khoản này đã bị chủ rạp khoá.' });
     const wanted = d && d.room ? String(d.room) : 'main';
     const target = rooms.get(wanted);
     if (!target) return reply({ ok: false, error: 'Phòng này không còn nữa (có thể đã đóng vì không còn ai).', roomGone: true });
@@ -1877,11 +2059,29 @@ const handlers = {
 };
 
 // ---------------- WEBSOCKET ----------------
-const wss = new WebSocketServer({ server, path: '/ws', maxPayload: 16 * 1024 });
+// Không cho kết nối chờ quá lâu (chống kiểu tấn công gửi request thật chậm để giữ server)
+server.headersTimeout = 15000;
+server.requestTimeout = 30000;
+server.keepAliveTimeout = 5000;
+server.maxHeadersCount = 60;
+
+const wss = new WebSocketServer({
+  server, path: '/ws', maxPayload: 16 * 1024,
+  verifyClient(req) {
+    const ip = accounts.clientIp(req);
+    if (guard.blockedReason(ip)) return { code: 403 };
+    // trang web khác không được mở kết nối tới rạp bằng tài khoản của người xem
+    const origin = req.headers.origin;
+    if (origin) { try { if (new URL(origin).host !== req.headers.host) return { code: 403 }; } catch { return { code: 403 }; } }
+    if (!guard.wsOpen(ip)) return { code: 429 };
+    req.guardIp = ip;
+    return null;
+  },
+});
 
 wss.on('connection', (ws, req) => {
   const acc = accounts.accountFromToken(accounts.tokenFromReq(req));
-  const client = { id: uid(), ws, user: null, room: null, rate: {}, alive: true, token: null, username: acc ? acc.username : null };
+  const client = { id: uid(), ws, user: null, room: null, rate: {}, alive: true, token: null, username: acc ? acc.username : null, ip: req.guardIp || accounts.clientIp(req) };
   clients.set(ws, client);
   send(ws, 'hello', {
     id: client.id,
@@ -1903,12 +2103,15 @@ wss.on('connection', (ws, req) => {
     postSeconds: POST_SECONDS,
     voteSeconds: VOTE_SECONDS,
     stageSpots: STAGE_SPOTS,
+    turnstileSiteKey: config.turnstileSiteKey && config.turnstileSecret ? config.turnstileSiteKey : null,
   });
 
   ws.on('pong', () => { client.alive = true; });
 
   ws.on('message', async (raw) => {
     client.alive = true;
+    // gửi dồn dập (hơn 40 tin/giây): ngắt kết nối
+    if (!guard.wsMsgAllow(client)) { if (!client.cut) { client.cut = true; try { ws.close(4008); } catch { /* bỏ qua */ } } return; }
     let msg;
     try { msg = JSON.parse(raw.toString()); } catch { return; }
     if (!msg || typeof msg.t !== 'string') return;
@@ -1925,6 +2128,9 @@ wss.on('connection', (ws, req) => {
   });
 
   ws.on('close', () => {
+    if (client.closed) return;
+    client.closed = true;
+    guard.wsClose(client.ip);
     if (client.room) client.room.leave(client, 'left');
     clients.delete(ws);
   });
