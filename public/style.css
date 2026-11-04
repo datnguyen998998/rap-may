@@ -934,3 +934,86 @@ body.hud-idle #topbar .top-act { opacity: 1; }
 .join-logo { display: flex; align-items: center; gap: 12px; }
 .join-logo img { width: 56px; height: 56px; flex: none; filter: drop-shadow(0 4px 14px rgba(255, 110, 80, .45)); }
 @media (max-width: 760px) { .join-logo img { width: 44px; height: 44px; } }
+
+/* =====================================================================
+   ĐIỆN THOẠI — BỐ CỤC GỌN (đặt cuối file để đè các quy tắc phía trên)
+   - Tên bài: 1 dòng, chữ nhỏ; các nút vote / chuyển bài / câu đoán nằm
+     chung 1 hàng dạng viên thuốc nhỏ.
+   - Menu phải: chỉ còn biểu tượng, nút nhỏ và nét mảnh.
+   - Thanh dưới: nút nhỏ hơn, mỏng hơn.
+   ===================================================================== */
+@media (max-width: 760px) {
+  :root { --dock-w: 46px; }
+
+  /* --- Thanh trên --- */
+  #topbar { padding: 6px 8px; min-height: 0; }
+  .top-right { gap: 4px; }
+  .round-btn, #profileBtn, .top-act { width: 30px; height: 30px; }
+  #profileBtn { font-size: 13px; border-width: 2px; }
+  #pointsChip { padding: 4px 8px; font-size: 12px; }
+  .round-btn svg, .top-act svg { width: 15px; height: 15px; }
+
+  /* --- Đang chiếu: gọn 1 khối nhỏ --- */
+  .hud-now-playing { top: 46px; left: 8px; right: calc(var(--dock-w) + 18px); max-width: 290px; }
+  .hud-now-playing::before { inset: -10px -14px -10px -10px; }
+  .hud-now-playing .eyebrow { display: none; }
+  #npPanel.replay .eyebrow { display: block; font-size: 9px; letter-spacing: .1em; }
+  .hud-now-playing h1 {
+    font-size: 13.5px; font-weight: 600; line-height: 1.3; margin: 0; letter-spacing: -0.01em;
+    white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+  }
+  .hud-now-playing p { font-size: 11px; font-weight: 400; margin-top: 2px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  #npBar { height: 2px; margin-top: 6px; max-width: 220px; }
+  .heat-wrap { max-width: 220px; }
+  .heat-wrap canvas { height: 20px; }
+  .event-banner { font-size: 10.5px; padding: 4px 9px; margin-bottom: 6px; max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+
+  /* các nút điều khiển bài: cùng 1 hàng, nhỏ */
+  .change-track-button, .skip-poll, .poll-new { display: inline-flex; vertical-align: middle; margin: 8px 4px 0 0; }
+  .change-track-button.hidden, .skip-poll.hidden, .poll-new.hidden { display: none; }
+  .change-track-button, .skip-vote-button, .poll-new {
+    height: 28px; min-height: 0; padding: 0 10px; gap: 5px; border-radius: 999px;
+    font-size: 11px; font-weight: 600; align-items: center; white-space: nowrap;
+  }
+  .change-track-button svg, .skip-vote-button svg { width: 12px; height: 12px; }
+  .skip-poll { max-width: none; gap: 0; }
+  .skip-vote-button b { font-size: 11px; margin-left: 2px; }
+  .skip-vote-status, .skip-poll progress { display: none; }
+  #discoTag { font-size: 10.5px; margin-top: 8px; padding: 0; }
+  #discoTag svg { width: 12px; height: 12px; }
+  .poll-card { max-width: 270px; padding: 10px 12px; margin-top: 8px; }
+  .poll-q { font-size: 13px; }
+
+  /* --- Menu phải: chỉ biểu tượng --- */
+  #dock { right: 6px; bottom: 112px; top: auto; transform: none; padding: 4px 3px; border-radius: 16px; gap: 2px; max-height: calc(100vh - 290px); }
+  .dock-collapse { width: 34px; height: 34px; margin-bottom: 2px; }
+  .dock-collapse svg { width: 16px; height: 16px; }
+  .dock-items { gap: 0; }
+  .dock-items button { padding: 7px 0; gap: 0; border-radius: 11px; }
+  .dock-items button span { display: none; }
+  .dock-items svg { width: 18px; height: 18px; stroke-width: 1.7; }
+  .dock-items .badge { top: 1px; right: 1px; min-width: 15px; height: 15px; font-size: 9px; padding: 0 4px; }
+
+  /* --- Thanh dưới --- */
+  .quick-chat { left: 8px; right: 8px; bottom: 8px; padding: 4px; border-radius: 14px; }
+  .quick-chat input { font-size: 14px; padding: 6px 4px; }
+  .emoji-trigger, #chatSend { width: 32px; height: 32px; border-radius: 10px; }
+  #viewBar { left: 8px; bottom: 56px; padding: 3px; gap: 1px; border-radius: 12px; }
+  #viewBar button { width: 30px; height: 30px; border-radius: 8px; }
+  #viewBar svg { width: 16px; height: 16px; stroke-width: 1.8; }
+  #viewBar .rooms-btn { width: 30px; padding: 0; justify-content: center; }
+  #viewBar .rooms-btn span { display: none; }
+  #viewBar .bar-sep { height: 18px; margin: 0 1px; }
+  #soundBar { right: 8px; left: auto; bottom: 56px; padding: 3px; gap: 1px; border-radius: 12px; }
+  #soundBar button { width: 30px; height: 30px; }
+  #soundBar svg { width: 16px; height: 16px; stroke-width: 1.8; }
+  #reactBar { left: 8px; bottom: 98px; padding: 3px; gap: 3px; border-radius: 12px; }
+  #reactBar .act { padding: 5px 8px; font-size: 14px; border-radius: 9px; font-weight: 500; }
+  #reactBar .act span { display: none; }
+  #soundBtn { bottom: 140px; }
+}
+/* màn hình rất hẹp (dưới 380px): bớt thêm khoảng cách */
+@media (max-width: 380px) {
+  .hud-now-playing { max-width: 240px; }
+  #reactBar .act { padding: 4px 6px; font-size: 13px; }
+}
