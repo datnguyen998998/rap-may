@@ -1115,7 +1115,9 @@ function setFocusMode(on) {
     if (state.drawer && state.drawer !== 'chat') closeDrawer();
     closeEmojiPanel?.();
     document.querySelectorAll('.popover').forEach((p) => p.classList.add('hidden'));
-    toast('👁️ Đã ẩn giao diện · bấm nút con mắt hoặc phím H để hiện lại', 3500);
+    // điện thoại / máy tính bảng không có bàn phím: không nhắc phím H
+    const touch = window.matchMedia?.('(hover: none) and (pointer: coarse)').matches;
+    toast(touch ? '👁️ Đã ẩn giao diện · bấm nút con mắt ở góc dưới để hiện lại' : '👁️ Đã ẩn giao diện · bấm nút con mắt hoặc phím H để hiện lại', 3500);
   }
   syncDock();
 }
@@ -1257,6 +1259,7 @@ function openDrawer(view) {
   const d = $('drawer');
   d.dataset.view = view;
   d.classList.remove('hidden');
+  document.body.classList.add('drawer-open');
   $('drawerEyebrow').textContent = view === 'queue' ? 'CÙNG CHỌN, CÙNG XEM' : view === 'friends' ? 'KẾT BẠN · TẶNG QUÀ' : view === 'host' ? (state.room && !state.room.isMain ? 'CHỦ PHÒNG' : 'CHỦ RẠP') : `${humansCount()} NGƯỜI ĐANG Ở ĐÂY`;
   $('drawerTitle').textContent = view === 'queue' ? 'Danh sách chờ' : view === 'friends' ? 'Bạn bè' : view === 'host' ? 'Quản lý phòng' : 'Trò chuyện';
   if (view === 'chat') {
@@ -1269,6 +1272,7 @@ function openDrawer(view) {
 function closeDrawer() {
   state.drawer = null;
   $('drawer').classList.add('hidden');
+  document.body.classList.remove('drawer-open');
   syncDock();
 }
 $('drawerClose').onclick = closeDrawer;
