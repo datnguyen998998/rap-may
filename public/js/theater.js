@@ -1428,6 +1428,7 @@ export class Theater {
     let base = 60;
     if (aspect < 1.4) base = THREE.MathUtils.radToDeg(2 * Math.atan(Math.tan(THREE.MathUtils.degToRad(42)) / aspect));
     base = Math.min(base, 100);
+    if (this.discoBall) this.discoBall.visible = aspect >= 1; // màn hình dọc: ẩn quả cầu disco để không che màn chiếu
     this.camera.fov = THREE.MathUtils.clamp(base + (this.zoom || 0), 25, 110);
     this.camera.updateProjectionMatrix();
   }
