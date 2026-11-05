@@ -363,6 +363,25 @@ Hết tuần, top 1–2–3 mỗi bảng nhận **+100 / +60 / +40 🍿** và hu
 - **Video được xem nhiều nhất:** số lượt chiếu, tổng số phút người xem (2 người xem 10 phút = 20 phút) và lúc đông người xem nhất.
 - Bấm **Xem dạng bảng** để xem số liệu dạng bảng. Rạp giữ thống kê 60 ngày gần nhất trong `data/db.json`.
 
+## Phần 4g — Rạp lúc nào cũng có không khí: bot "sống" và danh sách phát của rạp
+
+**1. Danh sách phát của rạp (file `playlist.txt`, đặt cạnh `server.js`)**
+- Khi hàng chờ trống và có người trong rạp, rạp **tự chiếu ngẫu nhiên** video trong file này, để màn hình không bao giờ đen. Góc trái hiện "🎬 Rạp gợi ý · gửi video để chiếu ngay".
+- Khách gửi video thì video của khách **được chiếu ngay**, không phải đợi hết video của rạp.
+- Mỗi dòng một video: `link YouTube | thể loại | BPM`. Thể loại (không bắt buộc): `soi-dong`, `kinh-di`, `lang-man`. BPM chỉ cần cho nhạc sôi động (để laser, đèn chớp chạy đúng nhịp). Ví dụ:
+  - `https://www.youtube.com/watch?v=xxxxxxxxxxx | soi-dong | 128`
+  - `https://youtu.be/xxxxxxxxxxx | kinh-di`
+- Sửa file lúc nào cũng được, khoảng 3 giây sau rạp tự đọc lại. Không nên dùng video phát trực tiếp (livestream). File mẫu có sẵn 3 phim hoạt hình ngắn mã nguồn mở của Blender, bạn thay bằng video của mình.
+- Rạp không lặp lại video vừa chiếu gần đây. Video bị xoá hoặc chặn nhúng thì rạp tự bỏ qua.
+
+**2. Bot "sống" hơn** (chỉ ở sảnh chính, chỉ khi có người thật trong rạp)
+- **Chào khách mới** bằng tên và vẫy tay; trả lời khi khách chào ("chào cả nhà") hoặc hỏi "có ai không".
+- **Hùa theo khách:** khách thả emoji thì 1–3 bot thả theo; khách ném cà chua, hoa hồng thì bot ném cùng; khách ném bỏng ngô trúng bot thì bot ném trả.
+- **Theo thể loại video:** nhạc Sôi động thì bot nhảy và lên sân khấu nhiều hơn; phim Kinh dị thì thả 😱, ném cà chua; Lãng mạn thì thả 😍, tung hoa hồng.
+- **Cổ vũ:** khách lên sân khấu thì bot reo hò, đôi khi lên quẩy cùng; pháo sáng nổ thì cả rạp reo; hết video thì bot vỗ tay.
+- Bot ném bỏng ngô vào nhau, thỉnh thoảng ném nhẹ vào khách (tối đa 1 lần / 45 giây). Bot có câu chat theo giờ (khuya, trưa, tối, sáng).
+- **Bot KHÔNG vote** (👍 lẫn bỏ qua), không lên bảng xếp hạng, không tính vào khoảnh khắc hot và thống kê. Rê chuột / chạm vào bot vẫn hiện chữ "Bot".
+
 ## Phần 4f — An ninh: chống tài khoản clone và phá hoại (DDoS)
 
 Rạp có sẵn các lớp bảo vệ sau, **tự chạy, không cần cài gì** (trừ ô "Tôi không phải robot" ở bước 3):
@@ -501,6 +520,7 @@ rap-phim/
 ├── lib/stats.js         ← thống kê người vào, giờ đông, video xem nhiều
 ├── lib/config.js        ← đọc config.json / biến môi trường
 ├── bot-chat.txt         ← câu chat của bot, mỗi dòng 1 câu
+├── playlist.txt         ← video rạp tự chiếu khi hàng chờ trống
 ├── tu-cam.txt           ← từ ngữ bị che thành *** trong chat, mỗi dòng 1 từ
 ├── config.example.json  ← mẫu cấu hình ngân hàng + mật khẩu duyệt (copy thành config.json)
 ├── data/db.json         ← (tự tạo khi chạy) tài khoản, điểm, tủ đồ — nhớ sao lưu!
