@@ -222,6 +222,48 @@ function loadBotLines() {
 }
 loadBotLines();
 fs.watchFile(BOT_CHAT_FILE, { interval: 3000 }, loadBotLines);
+
+function timedBotLine() {
+  const h = new Date(Date.now() + 7 * 3600000).getUTCHours();
+  if (h >= 23 || h < 4) return pick(['cú đêm điểm danh 🦉', 'khuya rồi mà vẫn mê phim 😂', 'ai còn thức xem với tui không 🌙']);
+  if (h >= 6 && h < 9) return pick(['chào buổi sáng cả rạp ☀️', 'sáng sớm đã có người xem rồi 😄']);
+  if (h >= 11 && h < 14) return pick(['vừa ăn trưa vừa xem phim, tuyệt vời 🍜', 'nghỉ trưa vô rạp cho chill 😌']);
+  if (h >= 18 && h < 22) return pick(['tối nay xem gì đây mọi người 🍿', 'ăn tối xong vô rạp liền 😄']);
+  return null;
+}
+
+// ---------------- DANH SÁCH PHÁT CỦA RẠP (playlist.txt) ----------------
+// Hàng chờ trống thì rạp tự chiếu video trong playlist.txt để màn hình không bao giờ đen.
+// Mỗi dòng: link YouTube | thể loại (không bắt buộc: soi-dong / kinh-di / lang-man) | BPM (không bắt buộc, cho nhạc sôi động)
+// Khách gửi video thì luôn được ưu tiên chiếu ngay.
+const PLAYLIST_FILE = path.join(__dirname, 'playlist.txt');
+const PLAYLIST_MOODS = {
+  'soi-dong': 'party', 'sôi động': 'party', 'soi dong': 'party', party: 'party', disco: 'party',
+  'kinh-di': 'horror', 'kinh dị': 'horror', 'kinh di': 'horror', horror: 'horror',
+  'lang-man': 'romance', 'lãng mạn': 'romance', 'lang man': 'romance', romance: 'romance',
+};
+let playlist = [];
+function loadPlaylist() {
+  try {
+    const raw = fs.readFileSync(PLAYLIST_FILE, 'utf8').replace(/^\uFEFF/, '');
+    const list = [];
+    for (const line of raw.split(/\r?\n/)) {
+      const l = line.trim();
+      if (!l || l.startsWith('#')) continue;
+      const [url, tag, bpmS] = l.split('|').map((x) => x.trim());
+      const videoId = parseVideoId(url);
+      if (!videoId) continue;
+      const bpm = Math.round(Number(bpmS));
+      list.push({ videoId, mood: PLAYLIST_MOODS[(tag || '').toLowerCase()] || 'normal', bpm: bpm >= 60 && bpm <= 180 ? bpm : 128 });
+    }
+    playlist = list;
+    console.log(`🎞️ Danh sách phát của rạp: ${playlist.length} video (playlist.txt)`);
+  } catch {
+    playlist = [];
+  }
+}
+loadPlaylist();
+fs.watchFile(PLAYLIST_FILE, { interval: 3000 }, loadPlaylist);
 // ---------------- YOUTUBE ----------------
 function parseVideoId(input) {
   input = cleanText(input, 300);
@@ -475,7 +517,9 @@ function createRoom({ id, name, isMain = false, ownerUsername = null, ownerName 
     recentBotLines.push(line);
     if (recentBotLines.length > 30) recentBotLines.shift();
     const people = humans();
-    const text = line.replace(/\{ten\}/gi, () => pick(people).name);
+    // thỉnh thoảng nói câu hợp với giờ trong ngày (giờ Việt Nam)
+    const timed = Math.random() < 0.15 ? timedBotLine() : null;
+    const text = (timed || line).replace(/\{ten\}/gi, () => pick(people).name);
     const b = pick(list);
     broadcast('chat', { id: b.id, name: b.name, character: b.character, tier: b.tier || 0, badges: '', text, at: Date.now() });
   }
@@ -501,10 +545,107 @@ function createRoom({ id, name, isMain = false, ownerUsername = null, ownerName 
       }
     }
     if (!current) return;
-    if (Math.random() < 0.25) broadcast('emote', { id: pick(list).id, kind: pick(['dance', 'dance', 'clap', 'wave']) });
-    if (Math.random() < 0.15) broadcast('emoji', { id: pick(list).id, emoji: pick(['😂', '👏', '🔥', '😍', '🍿', '🥳']) });
-    if (Math.random() < 0.05) goStage(pick(list));
+    const mood = moodNow();
+    const party = mood === 'party';
+    // động tác và cảm xúc theo thể loại video
+    if (Math.random() < (party ? 0.4 : 0.2)) broadcast('emote', { id: pick(list).id, kind: party ? pick(['dance', 'dance', 'dance', 'clap']) : pick(['dance', 'clap', 'wave']) });
+    if (Math.random() < 0.18) botEmoji(pick(list), pick(MOOD_EMOJI[mood] || MOOD_EMOJI.normal));
+    if (Math.random() < (party ? 0.12 : 0.03)) goStage(pick(list));
+    // ném bỏng ngô vào nhau, thỉnh thoảng ném nhẹ vào khách (tối đa 1 lần / 45 giây)
+    if (Math.random() < 0.12) {
+      const from = pick(sitting());
+      if (from) {
+        const people = humans().filter((h) => !h.stage);
+        let to = null;
+        if (people.length && Math.random() < 0.3 && Date.now() - lastBotHit > 45000) { to = pick(people).id; lastBotHit = Date.now(); }
+        else { const other = pick(sitting().filter((x) => x !== from)); to = other ? other.id : null; }
+        broadcast('popcorn', { from: from.id, to, seed: Math.floor(Math.random() * 1e9) });
+      }
+    }
+    // phim kinh dị: ném cà chua · lãng mạn: tung hoa hồng
+    if ((mood === 'horror' && Math.random() < 0.05) || (mood === 'romance' && Math.random() < 0.06)) {
+      const from = pick(sitting());
+      if (from) broadcast('throw', { from: from.id, item: mood === 'horror' ? 'tomato' : 'rose', seed: Math.floor(Math.random() * 1e9) });
+    }
   }, 4000);
+
+  // ---------------- BOT "SỐNG" HƠN ----------------
+  // Bot chỉ tạo không khí: ném đồ, thả cảm xúc, chào hỏi, cổ vũ, hùa theo khách.
+  // Bot KHÔNG vote, không lên bảng xếp hạng, không tính vào khoảnh khắc hot hay thống kê.
+  // Rê chuột / chạm vào bot vẫn thấy chữ "Bot".
+  const MOOD_EMOJI = {
+    party: ['🔥', '🥳', '👏', '😂', '🔥'],
+    horror: ['😱', '😱', '😭', '😂'],
+    romance: ['😍', '😍', '😭', '👏'],
+    normal: ['😂', '👏', '😍', '🔥', '😭'],
+  };
+  const GREETS = ['chào {ten} nha 👋', '{ten} vào rồi kìa, chào bạn 😄', 'hello {ten}, ngồi gần tui nè 🍿', 'welcome {ten} 🎉', 'chào {ten}, đang chiếu hay lắm nè'];
+  const HI_RE = /^(hi|hello|helo|hế lô|hé lô|chào|chao|xin chào|alo|yo)\b/i;
+  const ASK_RE = /(có ai|ai (đang )?(xem|ở đây|online)|mọi người (đâu|ơi)|có người không)/i;
+  let lastBotHit = 0, lastEcho = 0, lastReply = 0, lastGreet = 0;
+  const later = (ms, fn) => setTimeout(fn, ms);
+  const moodNow = () => (current ? current.mood || (current.energetic ? 'party' : 'normal') : 'normal');
+  const sitting = () => bots().filter((b) => !b.stage);
+  const alive = (b) => b && users.has(b.id);
+  function botEmoji(b, e) { if (alive(b)) broadcast('emoji', { id: b.id, emoji: e }); }
+  function botSay(b, text) { if (alive(b)) broadcast('chat', { id: b.id, name: b.name, character: b.character, tier: b.tier || 0, badges: '', text, at: Date.now() }); }
+  function someBots(n, list = bots()) {
+    const l = [...list];
+    const out = [];
+    while (out.length < n && l.length) out.push(l.splice(Math.floor(Math.random() * l.length), 1)[0]);
+    return out;
+  }
+  // phản ứng theo sự kiện của rạp
+  function botReact(kind) {
+    if (!isMain || !humans().length) return;
+    if (kind === 'start') for (const b of someBots(randInt(2, 4))) later(randInt(0, 3000), () => botEmoji(b, pick(['👏', '🥳', '🍿', '🔥'])));
+    if (kind === 'end') {
+      for (const b of someBots(randInt(4, 8), sitting())) {
+        later(randInt(0, 3500), () => { if (!alive(b)) return; broadcast('emote', { id: b.id, kind: 'clap' }); if (Math.random() < 0.5) botEmoji(b, '👏'); });
+      }
+    }
+    if (kind === 'pyro') for (const b of someBots(randInt(5, 10))) later(randInt(300, 4000), () => botEmoji(b, pick(['🔥', '🥳', '😱', '👏'])));
+    if (kind === 'stage') {
+      for (const b of someBots(randInt(2, 4), sitting())) later(randInt(800, 2500), () => botEmoji(b, pick(['🔥', '👏', '🥳'])));
+      if (Math.random() < 0.5) later(randInt(2000, 5000), () => { const b = pick(sitting()); if (b) goStage(b); }); // có bot lên quẩy cùng
+    }
+  }
+  // khách thả emoji: 1–3 bot hùa theo sau 1–3 giây
+  function botEcho(e) {
+    const now = Date.now();
+    if (now - lastEcho < 2500) return;
+    lastEcho = now;
+    for (const b of someBots(randInt(1, 3))) later(randInt(900, 3000), () => botEmoji(b, Math.random() < 0.7 ? e : pick(MOOD_EMOJI[moodNow()] || MOOD_EMOJI.normal)));
+  }
+  // khách chat: chào lại / trả lời "có ai không", còn lại thỉnh thoảng thả cảm xúc
+  function botReplyChat(u, text) {
+    const now = Date.now();
+    if (now - lastReply < 8000) return;
+    let line = null;
+    if (HI_RE.test(text)) line = pick(['chào {ten} nha 👋', 'hi {ten} 😄', 'chào bạn, ngồi xem cùng nè 🍿', 'yo {ten} 👋']);
+    else if (ASK_RE.test(text)) line = pick(['có nè 🙋', 'đang xem đây {ten} ơi', 'có tui nè, xem chung đi 🍿']);
+    if (!line) {
+      if (Math.random() < 0.3) { lastReply = now; const b = pick(sitting()); later(randInt(1200, 3000), () => botEmoji(b, pick(['😂', '👏', '😍', '🔥']))); }
+      return;
+    }
+    lastReply = now;
+    const b = pick(bots());
+    later(randInt(1500, 4000), () => { if (users.has(u.id)) botSay(b, line.replace(/\{ten\}/g, u.name)); });
+  }
+  // khách mới vào: 1 bot chào bằng tên + vẫy tay, 1 bot thả 👋 (tối đa 1 lần / 20 giây)
+  function botGreet(u) {
+    const now = Date.now();
+    if (now - lastGreet < 20000) return;
+    lastGreet = now;
+    const [a, b2] = someBots(2);
+    if (!a) return;
+    later(randInt(2500, 5000), () => {
+      if (!alive(a) || !users.has(u.id)) return;
+      botSay(a, pick(GREETS).replace(/\{ten\}/g, u.name));
+      broadcast('emote', { id: a.id, kind: 'wave' });
+    });
+    if (b2) later(randInt(5000, 8000), () => botEmoji(b2, '👋'));
+  }
   // ---------------- SÂN KHẤU ----------------
   function goStage(u) {
     if (u.stage) return { ok: false, error: 'Bạn đang ở trên sân khấu rồi!' };
@@ -530,6 +671,7 @@ function createRoom({ id, name, isMain = false, ownerUsername = null, ownerName 
     if (now - lastPyro >= PYRO_EVERY_MS) {
       lastPyro = now;
       broadcast('pyro', { at: now + 400, duration: PYRO_MS });
+      if (isMain) botReact('pyro');
       systemChat(`🎆 Sân khấu kín ${n} người quẩy ${Math.round(PYRO_EVERY_MS / 1000)} giây — PHÁO SÁNG!`);
     }
   }, 1000);
@@ -556,6 +698,7 @@ function createRoom({ id, name, isMain = false, ownerUsername = null, ownerName 
   }
 
   function finishVideo(reason) {
+    if (isMain && reason === 'ended' && current && !current.replay) botReact('end'); // hết video: bot vỗ tay
     clearTimeout(endTimer);
     endTimer = null;
     skipVotes = new Set();
@@ -608,6 +751,7 @@ function createRoom({ id, name, isMain = false, ownerUsername = null, ownerName 
         bpm: next.bpm || 128,
         startedAt: Date.now() + START_DELAY_MS,
         duration: null,
+        house: !!next.house, // video do rạp tự chiếu (playlist.txt)
       };
       // Phòng trường hợp không ai báo thời lượng: tự chuyển sau tối đa MAX_VIDEO_MINUTES
       endTimer = setTimeout(() => finishVideo('timeout'), MAX_VIDEO_MINUTES * 60000);
@@ -618,11 +762,47 @@ function createRoom({ id, name, isMain = false, ownerUsername = null, ownerName 
     broadcast('skip', skipPayload());
     if (current) {
       stats.play(current.videoId, current.title, humans().length);
-      systemChat(`🎬 Đang chiếu: "${current.title}" (đề xuất bởi ${current.byName})`);
+      if (current.house) systemChat(`🎬 Rạp đang chiếu: "${current.title}". Muốn xem gì thì gửi video vào Hàng chờ, video của bạn sẽ được chiếu ngay!`);
+      else systemChat(`🎬 Đang chiếu: "${current.title}" (đề xuất bởi ${current.byName})`);
       const proposer = users.get(next.byId);
       if (proposer && proposer.username) addPoints(proposer, wardrobe.POINTS.suggestionPlayed, 'video bạn đề xuất được chiếu');
+      if (isMain && !current.house) setTimeout(() => botReact('start'), 2500);
+    } else if (isMain) {
+      setTimeout(() => startHouse('house'), 3000); // hết video, hàng chờ trống: rạp tự chiếu tiếp
     }
   }
+
+  // ---------------- DANH SÁCH PHÁT CỦA RẠP ----------------
+  let houseLoading = false;
+  const houseRecent = [];
+  async function startHouse(reason) {
+    if (!isMain || houseLoading || current || voting || queue.length || !humans().length || !playlist.length) return;
+    houseLoading = true;
+    try {
+      for (let tries = 0; tries < Math.min(5, playlist.length); tries++) {
+        // không lặp lại những video vừa chiếu gần đây
+        const avoid = new Set(houseRecent.slice(-Math.floor(playlist.length / 2)));
+        const pool = playlist.filter((x) => !avoid.has(x.videoId));
+        const p = pick(pool.length ? pool : playlist);
+        houseRecent.push(p.videoId);
+        if (houseRecent.length > 60) houseRecent.shift();
+        const info = await fetchVideoInfo(p.videoId);
+        if (info.error) continue; // video bị xoá / chặn nhúng: thử video khác
+        if (current || voting || queue.length || !humans().length) return; // vừa có người gửi video
+        queue.push({
+          id: uid(), videoId: p.videoId, title: info.title, author: info.author, duration: info.duration,
+          energetic: p.mood === 'party', mood: p.mood, bpm: p.bpm,
+          byId: null, byName: 'Rạp gợi ý', byUsername: null, house: true,
+          voters: new Set(), likedBy: new Set(), addedAt: Date.now(), boostedAt: null,
+        });
+        playNext(reason || 'house');
+        return;
+      }
+    } finally {
+      houseLoading = false;
+    }
+  }
+  if (isMain) every(() => { if (!current && !voting) startHouse('house'); }, 15000);
 
   function setDuration(seconds) {
     if (!current || current.duration) return;
@@ -736,6 +916,7 @@ function createRoom({ id, name, isMain = false, ownerUsername = null, ownerName 
       text = moderation.clean(text); // che từ ngữ xấu thành ***
       broadcast('chat', { id: u.id, name: u.name, character: u.character, tier: u.tier || 0, badges: badgeText(u.username), text, at: Date.now() });
       trackFor(u, 'chat');
+      if (isMain && !u.bot) botReplyChat(u, text);
     },
 
     emoji(client, d) {
@@ -743,6 +924,7 @@ function createRoom({ id, name, isMain = false, ownerUsername = null, ownerName 
       if (!u || !EMOJIS.has(d) || rateLimited(client, 'emoji', 300)) return;
       broadcast('emoji', { id: u.id, emoji: d });
       trackFor(u, 'emoji');
+      if (isMain && !u.bot) botEcho(d);
       // khoảnh khắc hot: ghi lại emoji theo giây của video đang chiếu
       if (current && !current.replay && Date.now() >= current.startedAt) {
         moments.record(current.videoId, (Date.now() - current.startedAt) / 1000, d);
@@ -765,7 +947,7 @@ function createRoom({ id, name, isMain = false, ownerUsername = null, ownerName 
       if (!u) return reply({ ok: false, error: 'Bạn cần vào rạp trước.' });
       if (rateLimited(client, 'stage', 1500)) return reply({ ok: false, error: 'Từ từ thôi nào!' });
       const r = goStage(u);
-      if (r.ok) trackFor(u, 'stage');
+      if (r.ok) { trackFor(u, 'stage'); if (isMain) botReact('stage'); }
       reply(r);
     },
 
@@ -779,6 +961,9 @@ function createRoom({ id, name, isMain = false, ownerUsername = null, ownerName 
       const to = d && users.has(d.to) && d.to !== u.id ? d.to : null; // null = ném lên màn hình
       broadcast('popcorn', { from: u.id, to, seed: Math.floor(Math.random() * 1e9) });
       trackFor(u, 'popcorn');
+      // ném trúng bot: bot ném trả (một nửa số lần)
+      const hit = to && users.get(to);
+      if (isMain && hit && hit.bot && Math.random() < 0.5) later(randInt(1000, 2500), () => { if (alive(hit) && users.has(u.id)) broadcast('popcorn', { from: hit.id, to: u.id, seed: Math.floor(Math.random() * 1e9) }); });
       if (u.username) engage.addStat(u.username, 'popcorn', 1);
     },
 
@@ -788,6 +973,8 @@ function createRoom({ id, name, isMain = false, ownerUsername = null, ownerName 
       if (!u || !THROW_ITEMS.includes(d) || rateLimited(client, 'throw', 1200)) return;
       broadcast('throw', { from: u.id, item: d, seed: Math.floor(Math.random() * 1e9) });
       trackFor(u, 'popcorn');
+      // vài bot hùa theo ném cùng
+      if (isMain && Math.random() < 0.4) for (const b of someBots(randInt(1, 2), sitting())) later(randInt(800, 2200), () => { if (alive(b)) broadcast('throw', { from: b.id, item: d, seed: Math.floor(Math.random() * 1e9) }); });
     },
     'poll-create'(client, d, reply) {
       const u = client.user;
@@ -866,7 +1053,11 @@ function createRoom({ id, name, isMain = false, ownerUsername = null, ownerName 
       systemChat(`➕ ${u.name} gửi video: "${item.title}"`);
       trackFor(u, 'submit');
       if (!current && !voting) playNext('first');
-      else broadcast('queue', queuePayload());
+      else if (current && current.house && !voting) {
+        // rạp đang tự chiếu: video của khách được ưu tiên chiếu ngay
+        systemChat(`⏭️ Video của ${u.name} được ưu tiên, chuyển ngay!`);
+        playNext('priority');
+      } else broadcast('queue', queuePayload());
     },
 
     // Chen video của mình lên đầu hàng chờ (tốn 🍿)
@@ -1142,6 +1333,10 @@ function createRoom({ id, name, isMain = false, ownerUsername = null, ownerName 
     systemChat(`👋 ${user.name} đã vào ${isMain ? 'rạp' : 'phòng'}, ngồi ghế ${seatLabel(user.seat)}.`);
     announceSofa(user);
     ensureBots();
+    if (isMain) {
+      botGreet(user);
+      if (!current && !voting) setTimeout(() => startHouse('house'), 1500); // rạp trống: tự chiếu playlist
+    }
     notifyFriendsOnline(user, room);
     broadcastRooms();
     stats.visit(acc.username, allHumans().length);
