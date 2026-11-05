@@ -709,7 +709,7 @@ function tick() {
     const elapsed = (serverNow() - cur.startedAt) / 1000;
     $('npEyebrow').textContent = 'TRÊN MÀN ẢNH';
     $('npTitle').textContent = cur.title;
-    $('npSub').textContent = `${cur.byName} đề xuất · ${fmtTime(Math.max(0, elapsed))}` + (cur.duration ? ' / ' + fmtTime(cur.duration) : '');
+    $('npSub').textContent = `${cur.house ? '🎬 Rạp gợi ý · gửi video để chiếu ngay' : cur.byName + ' đề xuất'} · ${fmtTime(Math.max(0, elapsed))}` + (cur.duration ? ' / ' + fmtTime(cur.duration) : '');
     bar.style.width = cur.duration ? Math.min(100, Math.max(0, (elapsed / cur.duration) * 100)) + '%' : '0';
   } else {
     $('npEyebrow').textContent = 'RẠP MÂY · XEM PHIM CÙNG NHAU';
@@ -2678,7 +2678,7 @@ async function openHost() {
 }
 function renderHost() {
   const cur = state.current;
-  $('hostNow').textContent = cur ? `Đang chiếu: ${cur.title} (${cur.byName} đề xuất)` : state.voting ? 'Đang bình chọn video tiếp theo.' : 'Chưa có video nào đang chiếu.';
+  $('hostNow').textContent = cur ? `Đang chiếu: ${cur.title} (${cur.house ? 'rạp tự chiếu từ playlist.txt' : cur.byName + ' đề xuất'})` : state.voting ? 'Đang bình chọn video tiếp theo.' : 'Chưa có video nào đang chiếu.';
   $('hostSkip').disabled = !cur && !state.voting;
   const box = $('hostPeople');
   box.innerHTML = '';
