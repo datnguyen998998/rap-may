@@ -173,6 +173,22 @@ function effectiveOutfit(u) {
   const hat = u.gifts.find((g) => g.hat && g.until > Date.now());
   return hat ? { ...u.outfit, hat: hat.hat } : u.outfit;
 }
+// ---------------- KHÁCH XEM THỬ (không cần tài khoản) ----------------
+const GUEST_MODE = process.env.GUEST_MODE !== '0';           // đặt GUEST_MODE=0 để tắt
+const GUESTS_PER_IP = Number(process.env.GUESTS_PER_IP || 3); // tối đa khách xem thử trên 1 mạng
+const GUEST_OK = new Set(['ka', 'time', 'join', 'emoji', 'emote', 'seat', 'duration', 'ended', 'video-error', 'rooms']);
+function makeGuest() {
+  const n = String(1000 + Math.floor(Math.random() * 9000));
+  return {
+    guest: true, id: 'g' + crypto.randomBytes(6).toString('hex'), username: 'khach:' + n + crypto.randomBytes(3).toString('hex'),
+    displayName: 'Khách ' + n, character: CHARACTERS[Math.floor(Math.random() * CHARACTERS.length)],
+    outfit: wardrobe.defaultOutfit(), points: 0, balance: 0,
+  };
+}
+function guestPublic(g) {
+  return { guest: true, username: null, displayName: g.displayName, character: g.character, outfit: g.outfit, points: 0, balance: 0, donated: 0, tier: 0, unlocks: [], invites: { joined: 0, done: 0 } };
+}
+
 // Lý do chưa được vote (null = được vote). Chủ rạp / chủ phòng luôn được vote.
 function voteBlock(u, hostOk) {
   if (!u || u.bot) return 'no';
@@ -1323,11 +1339,10 @@ function createRoom({ id, name, isMain = false, ownerUsername = null, ownerName 
     client.room = room;
     client.token = crypto.randomBytes(18).toString('hex');
     tokens.set(client.token, user);
-    acc.lastSeen = Date.now();
-    db.save();
+    if (acc.guest) user.guest = true; else { acc.lastSeen = Date.now(); db.save(); }
     room.emptySince = null;
     if ((mutes.get(acc.username) || 0) > Date.now()) setTimeout(() => send(client.ws, 'chat-blocked', { reason: `🔇 Bạn đang bị tắt chat, còn ${Math.ceil((mutes.get(acc.username) - Date.now()) / 60000)} phút nữa.` }), 1500);
-    reply({ ok: true, me: publicUser(user), token: client.token, account: accounts.publicAccount(acc), state: fullState(), engage: engageState(acc), events: engage.eventsView(acc), isHost: isHost(user), poll: pollStore.view(user.id), room: info(), ...extra });
+    reply({ ok: true, me: publicUser(user), token: client.token, account: acc.guest ? guestPublic(acc) : accounts.publicAccount(acc), state: fullState(), engage: acc.guest ? null : engageState(acc), events: engage.eventsView(acc.guest ? null : acc), isHost: isHost(user), poll: pollStore.view(user.id), room: info(), ...extra });
     broadcast('user-joined', publicUser(user), client.ws);
     broadcast('skip', skipPayload());
     systemChat(`👋 ${user.name} đã vào ${isMain ? 'rạp' : 'phòng'}, ngồi ghế ${seatLabel(user.seat)}.`);
@@ -1337,9 +1352,9 @@ function createRoom({ id, name, isMain = false, ownerUsername = null, ownerName 
       botGreet(user);
       if (!current && !voting) setTimeout(() => startHouse('house'), 1500); // rạp trống: tự chiếu playlist
     }
-    notifyFriendsOnline(user, room);
+    if (!acc.guest) notifyFriendsOnline(user, room);
     broadcastRooms();
-    stats.visit(acc.username, allHumans().length);
+    if (!acc.guest) stats.visit(acc.username, allHumans().length);
   }
 
   // Rời phòng (đóng trang, mất mạng, hoặc sang phòng khác)
@@ -2076,7 +2091,19 @@ const handlers = {
 
   // Vào rạp / chuyển phòng: d = { room: id phòng (bỏ trống = sảnh chính), password }
   join(client, d, reply) {
-    const acc = client.username && accounts.getAccount(client.username);
+    let acc = client.username && accounts.getAccount(client.username);
+    if (!acc && d && d.guest) {
+      // Xem thử không cần tài khoản: chỉ ở sảnh chính, chỉ xem + thả emoji + đổi ghế
+      if (!GUEST_MODE) return reply({ ok: false, error: 'Rạp chưa mở chế độ xem thử, bạn tạo tài khoản nhé.', needLogin: true });
+      if (client.user && client.room) return reply({ ok: true, me: publicUser(client.user), token: client.token, state: client.room.fullState(), room: client.room.info(), isHost: false, poll: client.room.pollView(client.user.id), account: guestPublic(client.guestAcc) });
+      if (d.room && d.room !== 'main') return reply({ ok: false, error: 'Tạo tài khoản miễn phí để vào phòng riêng nhé!', needAccount: true });
+      const sameIp = [...clients.values()].filter((c) => c.guestAcc && c.user && c.ip === client.ip).length;
+      if (sameIp >= GUESTS_PER_IP) return reply({ ok: false, error: 'Mạng này đã có nhiều khách xem thử rồi, bạn tạo tài khoản để vào nhé.', needLogin: true });
+      if (rateLimited(client, 'guestjoin', 2000)) return reply({ ok: false, error: 'Từ từ thôi nào!' });
+      client.guestAcc = client.guestAcc || makeGuest();
+      acc = client.guestAcc;
+      return mainRoom().join(client, acc, reply);
+    }
     if (!acc) return reply({ ok: false, error: 'Bạn cần đăng nhập trước.', needLogin: true });
     if (guard.userBanned(acc.username)) return reply({ ok: false, error: 'Tài khoản này đã bị chủ rạp khoá.' });
     const wanted = d && d.room ? String(d.room) : 'main';
@@ -2299,6 +2326,8 @@ wss.on('connection', (ws, req) => {
     voteSeconds: VOTE_SECONDS,
     stageSpots: STAGE_SPOTS,
     turnstileSiteKey: config.turnstileSiteKey && config.turnstileSecret ? config.turnstileSiteKey : null,
+    housePlaylist: playlist.length > 0,
+    guestMode: GUEST_MODE,
   });
 
   ws.on('pong', () => { client.alive = true; });
@@ -2315,6 +2344,8 @@ wss.on('connection', (ws, req) => {
     const handler = own(handlers, msg.t) ? handlers[msg.t] : client.room && own(client.room.handlers, msg.t) ? client.room.handlers[msg.t] : null;
     if (!handler) return;
     const reply = (data) => { if (msg.rid) send(ws, 'reply', { rid: msg.rid, data }); };
+    // khách xem thử: chỉ được xem, thả emoji, động tác, đổi ghế
+    if (client.guestAcc && client.user && !GUEST_OK.has(msg.t)) return reply({ ok: false, needAccount: true, error: '✨ Tạo tài khoản miễn phí (chưa tới 1 phút) để dùng tính năng này nhé!' });
     try {
       await handler(client, msg.d, reply);
     } catch (e) {
