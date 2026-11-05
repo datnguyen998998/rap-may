@@ -35,8 +35,8 @@ const SKIP_PERCENT = 35;              // TRÊN 35% số người thật trong ph
 const MAX_VIDEO_MINUTES = 240;        // video dài hơn 4 tiếng sẽ bị bỏ qua
 const START_DELAY_MS = 2000;          // chờ 2 giây cho mọi người tải video rồi mới chạy
 const VOTE_SECONDS = 15;              // thời gian vòng bình chọn video tiếp theo
-const BOT_MIN = 30;                   // số bot trong rạp thay đổi ngẫu nhiên từ 30 …
-const BOT_MAX = 50;                   // … đến 50 (đặt cả hai = 0 để tắt bot)
+const BOT_MIN = 50;                   // số bot trong rạp thay đổi ngẫu nhiên từ 30 …
+const BOT_MAX =90;                   // … đến 50 (đặt cả hai = 0 để tắt bot)
 const BOT_REROLL_MIN = [4, 9];        // cứ 4–9 phút lại chọn con số mới (bot vào/ra dần dần như khách thật)
 const MIN_FREE_SEATS = 10;            // luôn chừa ít nhất ngần này ghế trống
 const STAGE_SPOTS = 5;                // số chỗ trên sân khấu
