@@ -1,0 +1,19 @@
+# DANH SÁCH PHÁT CỦA RẠP — khi hàng chờ trống, rạp tự chiếu ngẫu nhiên các video dưới đây
+# để màn hình không bao giờ đen. Khách gửi video thì video của khách được chiếu ngay.
+#
+# Mỗi dòng 1 video:   link YouTube | thể loại | BPM
+#   - thể loại (không bắt buộc): soi-dong  hoặc  kinh-di  hoặc  lang-man   (để trống = bình thường)
+#   - BPM (không bắt buộc, chỉ cho nhạc sôi động): nhịp bài nhạc, ví dụ 128 → laser, đèn chớp chạy đúng nhịp
+# Dòng bắt đầu bằng # là ghi chú, rạp bỏ qua. Sửa file lúc nào cũng được, khoảng 3 giây sau rạp tự đọc lại.
+# Lưu file bằng mã UTF-8. Không nên dùng video phát trực tiếp (livestream).
+#
+# Ví dụ:
+#   https://www.youtube.com/watch?v=xxxxxxxxxxx | soi-dong | 128
+#   https://youtu.be/xxxxxxxxxxx | kinh-di
+#   https://www.youtube.com/watch?v=xxxxxxxxxxx | lang-man
+#   https://www.youtube.com/watch?v=xxxxxxxxxxx
+
+# Phim hoạt hình ngắn mã nguồn mở của Blender Foundation (giấy phép mở) — thay bằng video của bạn
+https://www.youtube.com/watch?v=aqz-KE-bpKQ
+https://www.youtube.com/watch?v=eRsGyueVLvQ | lang-man
+https://www.youtube.com/watch?v=R6MlUcmOul8
