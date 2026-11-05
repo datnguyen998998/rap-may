@@ -141,6 +141,8 @@ Dùng Render gói **Starter** (khoảng 7 USD/tháng) + ổ lưu dữ liệu 1 G
 ```
 
 ### Thanh menu bên phải (bấm ˄ để thu gọn / mở)
+Thanh chỉ giữ 4 nút hay dùng: **Gửi video · Hàng chờ · Trò chuyện · Bạn bè**. Các nút còn lại (**Chọn ghế · Chiếu ảnh · Tủ đồ · Phòng riêng · Quản lý · Ủng hộ**) nằm trong nút **⋯ Thêm**. Trên **điện thoại dọc**, thanh này thành **thanh tab 5 ô ở đáy màn hình**, ngay trên ô chat.
+
 | Nút | Chức năng |
 |---|---|
 | **Chọn ghế** (hiện mã ghế của bạn, ví dụ E05) | Mở **sơ đồ 100 ghế** hàng A–J. Ô xanh chanh ✓ là ghế của bạn, ô đỏ là đã có người, ô xám xanh là bot (bấm vào thì bot nhường ghế). Bấm ô trống để chuyển chỗ. Vẫn có thể bấm trực tiếp lên ghế trong rạp 3D |
@@ -152,6 +154,14 @@ Dùng Render gói **Starter** (khoảng 7 USD/tháng) + ổ lưu dữ liệu 1 G
 | **Quản lý** (chỉ chủ rạp / chủ phòng mới thấy) | Chuyển bài, khoá chat, ghim tin nhắn, tắt chat một người (xem Phần 4e) |
 | **Tủ đồ** | Đổi biệt danh, nhân vật, màu áo; mặc mũ / trang phục / phụ kiện; xem hạng và cách kiếm 🍿 |
 | **Ủng hộ** | Ủng hộ chủ rạp qua mã QR ngân hàng để nhận 🍿 (xem Phần 4) |
+
+### Trên điện thoại (cầm dọc)
+- **Đáy màn hình:** ô chat, phía trên là thanh tab 5 ô (Gửi video · Hàng chờ · Trò chuyện · Bạn bè · Thêm).
+- **Cột nhỏ bên trái:** 4 góc nhìn. **Cột nhỏ bên phải:** ⚡ đèn chớp, CC phụ đề, 🔊 tiếng.
+- **Nút 😀 cạnh ô chat:** hàng trên cùng là **"Thả lên rạp"** (emoji bay lên, nhảy, vẫy, vỗ tay, 🎤 sân khấu, 🍿 🍅 🌹). Bên dưới là emoji để chèn vào tin nhắn.
+- **Ngăn Trò chuyện / Hàng chờ** mở cao nửa màn hình để vẫn thấy màn chiếu. **Kéo thanh nhỏ ở đầu ngăn lên** để mở cao hơn, **kéo xuống** để thu lại hoặc đóng (chạm vào thanh cũng đổi cao / thấp).
+- **Tin ghim** là một dòng mỏng phía trên thanh tab; bấm vào để mở Trò chuyện.
+- Lời nhắc "Xoay ngang" tự ẩn sau 4 giây. **Mẹo dùng rạp** chỉ hiện 3 lần đầu, bấm ✕ là tắt hẳn.
 
 ### Các nút khác
 | Vị trí | Nút |
@@ -362,6 +372,20 @@ Hết tuần, top 1–2–3 mỗi bảng nhận **+100 / +60 / +40 🍿** và hu
 - **Trung bình số người online theo giờ (giờ Việt Nam):** rạp ghi lại số người online mỗi 5 phút. 3 giờ đông nhất được tô sáng, kèm gợi ý nên đặt Đêm phim lúc mấy giờ.
 - **Video được xem nhiều nhất:** số lượt chiếu, tổng số phút người xem (2 người xem 10 phút = 20 phút) và lúc đông người xem nhất.
 - Bấm **Xem dạng bảng** để xem số liệu dạng bảng. Rạp giữ thống kê 60 ngày gần nhất trong `data/db.json`.
+
+## Phần 4h — Xem thử không cần tài khoản
+
+Ở màn hình đăng nhập có nút **👀 Vào xem thử, không cần tài khoản**. Khách mới bấm là vào rạp ngay với tên **"Khách 1234"** và một nhân vật ngẫu nhiên.
+
+- **Khách được:** xem phim, thả emoji bay lên, nhảy / vẫy / vỗ tay, đổi ghế, đọc chat.
+- **Khách chưa được** (bấm vào sẽ hiện lời mời tạo tài khoản): chat, gửi video, bình chọn, vote bỏ qua, đoán nhanh, ném đồ, lên sân khấu, tủ đồ, kết bạn, phòng riêng, tích 🍿.
+- Bấm **Tạo tài khoản** trong lời mời: khung đăng ký hiện lên mà **rạp vẫn chạy phía sau**. Tạo xong là vào lại rạp ngay bằng tài khoản mới (có nút "← Quay lại rạp" nếu đổi ý).
+- Khách **không được tính** vào vote bỏ qua, bảng xếp hạng, thống kê lượt vào, và không có 🍿. Khách chỉ vào được **sảnh chính**.
+- Chống phá: mỗi mạng (IP) tối đa **3 khách xem thử** cùng lúc. Đổi bằng biến môi trường `GUESTS_PER_IP`. Muốn **tắt hẳn** chế độ xem thử: đặt `GUEST_MODE=0` (nút xem thử sẽ tự ẩn).
+
+## Phần 4i — An toàn với đèn chớp
+- Máy nào bật **"Giảm chuyển động"** (Windows: *Cài đặt → Trợ năng → Hiệu ứng hình ảnh → Hiệu ứng hoạt ảnh*; iPhone: *Cài đặt → Trợ năng → Chuyển động → Giảm chuyển động*; Android: *Xoá hoạt ảnh*) thì rạp **tự tắt laser và đèn chớp** ngay từ đầu, và các hiệu ứng chuyển động của nút cũng tắt. Người xem vẫn bật lại được bằng nút ⚡.
+- Lần đầu gặp video Sôi động trong mỗi lần vào rạp, rạp hiện nhắc: video có đèn chớp nhấp nháy và cách tắt bằng nút ⚡.
 
 ## Phần 4g — Rạp lúc nào cũng có không khí: bot "sống" và danh sách phát của rạp
 
