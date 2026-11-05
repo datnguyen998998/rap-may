@@ -65,6 +65,8 @@ class Net {
 }
 
 // ---------------- LƯU TUỲ CHỌN TRÊN MÁY ----------------
+// Người dùng bật "giảm chuyển động" trong cài đặt máy (thường vì nhạy cảm với ánh sáng nhấp nháy)
+const REDUCED_MOTION = !!(window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches);
 const store = {
   get(k, def) { try { const v = localStorage.getItem('rap.' + k); return v === null ? def : JSON.parse(v); } catch { return def; } },
   set(k, v) { try { localStorage.setItem('rap.' + k, JSON.stringify(v)); } catch { /* bỏ qua */ } },
@@ -109,7 +111,7 @@ const state = {
   unread: 0,
   prefs: {
     quality: store.get('quality', 'high'),
-    lasers: store.get('lasers', true),
+    lasers: store.get('lasers', !REDUCED_MOTION), // máy bật "giảm chuyển động": tắt đèn chớp, laser mặc định
     captions: store.get('captions', false),
     autoFade: store.get('autoFade', true),
     dim: store.get('dim', true),
@@ -132,7 +134,7 @@ function applyPrefs() {
   player.setCaptions(state.prefs.captions);
   $('optQuality').textContent = state.prefs.quality === 'high' ? '✨ Độ nét: Cao (bấm để chuyển Mượt)' : '⚡ Độ nét: Mượt (bấm để chuyển Cao)';
   $('laserBtn').classList.toggle('dim', !state.prefs.lasers);
-  $('laserBtn').title = state.prefs.lasers ? 'Tắt laser và đèn chớp trên máy bạn' : 'Bật laser và đèn chớp trên máy bạn';
+  $('laserBtn').title = state.prefs.lasers ? 'Tắt laser và đèn chớp trên máy bạn (có ánh sáng nhấp nháy)' : 'Bật laser và đèn chớp trên máy bạn (có ánh sáng nhấp nháy)';
   $('ccBtn').classList.toggle('on', state.prefs.captions);
   $('ccBtn').classList.toggle('dim', !state.prefs.captions);
   $('ccBtn').title = state.prefs.captions ? 'Tắt phụ đề video (chỉ trên máy bạn)' : 'Bật phụ đề video (chỉ trên máy bạn)';
@@ -307,8 +309,12 @@ $('rulesLink').onclick = (e) => { e.preventDefault(); $('rulesModal').classList.
 $('rulesClose').onclick = () => $('rulesModal').classList.add('hidden');
 
 async function afterAuth(res) {
+  const fromGuest = state.guest && state.everJoined;
   state.account = res.account;
+  state.guest = false;
   state.kicked = false;
+  syncGuestUi();
+  if (fromGuest) { state.pendingJoin = true; net.reconnect(); return; } // đang xem thử: vào lại rạp ngay bằng tài khoản mới
   showLobby();
   $('joinBtn').disabled = true;
   net.reconnect(); // kết nối lại để máy chủ nhận ra tài khoản
@@ -355,9 +361,65 @@ $('signupForm').addEventListener('submit', async (e) => {
   afterAuth(res);
 });
 
+// ---------------- XEM THỬ KHÔNG CẦN TÀI KHOẢN ----------------
+// Khách được: xem, thả emoji, động tác, đổi ghế, đọc chat. Còn lại: mời tạo tài khoản.
+const GUEST_BLOCK = [
+  '#chatInput', '#chatSend', '#dock [data-act=video]', '#dock [data-act=post]', '#dock [data-act=friends]', '#dock [data-act=wardrobe]',
+  '#dock [data-act=support]', '#dock [data-act=rooms]', '#roomsBtn', '#roomChip', '#queueAdd', '#queueList button', '#skipBtn', '#pollOpts button',
+  '#pollNewBtn', '#missionBtn', '#leaderBtn', '#pointsChip', '#profileBtn', '#stageBtn', '#popcornBtn', '#tomatoBtn', '#roseBtn',
+  '[data-pact=stage]', '[data-pact=popcorn]', '[data-pact=tomato]', '[data-pact=rose]', '#optInvite', '#eventBanner',
+].join(',');
+const GUEST_WHY = [
+  ['#chatInput,#chatSend', 'Tạo tài khoản để chat cùng cả rạp nhé.'],
+  ['[data-act=video],#queueAdd', 'Tạo tài khoản để gửi video của bạn lên màn ảnh.'],
+  ['#queueList button,#skipBtn', 'Tạo tài khoản để bình chọn video.'],
+  ['#pollOpts button,#pollNewBtn', 'Tạo tài khoản để tham gia đoán nhanh và nhận 🍿.'],
+  ['[data-act=friends]', 'Tạo tài khoản để kết bạn và tặng quà.'],
+  ['[data-act=wardrobe],#profileBtn,#pointsChip', 'Tạo tài khoản để tích 🍿, lên hạng và thay đồ cho nhân vật.'],
+  ['[data-act=rooms],#roomsBtn,#roomChip', 'Tạo tài khoản để mở phòng riêng với hội bạn.'],
+  ['#stageBtn,#popcornBtn,#tomatoBtn,#roseBtn,[data-pact]', 'Tạo tài khoản để lên sân khấu và ném đồ cùng mọi người.'],
+];
+function syncGuestUi() {
+  const g = !!(state.guest && !state.account?.username);
+  document.body.classList.toggle('is-guest', g);
+  $('chatInput').placeholder = g ? 'Tạo tài khoản để chat cùng cả rạp…' : 'Nói gì với cả rạp đi…';
+  $('authBack').classList.toggle('hidden', !(g && state.joined));
+}
+function askAccount(el) {
+  const hit = GUEST_WHY.find(([sel]) => el && el.closest(sel));
+  $('guestWhy').textContent = hit ? hit[1] : 'Tính năng này cần tài khoản.';
+  closeEmojiPanel();
+  openModal('guestModal');
+}
+document.addEventListener('click', (e) => {
+  if (!document.body.classList.contains('is-guest')) return;
+  const el = e.target.closest(GUEST_BLOCK);
+  if (!el) return;
+  e.preventDefault();
+  e.stopImmediatePropagation();
+  askAccount(el);
+}, true);
+$('chatInput').addEventListener('focus', () => { if (document.body.classList.contains('is-guest')) { $('chatInput').blur(); askAccount($('chatInput')); } });
+$('guestBtn').onclick = async () => {
+  state.guest = true;
+  $('guestBtn').disabled = true;
+  $('authMsg').textContent = '';
+  await join();
+  $('guestBtn').disabled = false;
+};
+$('guestSignup').onclick = () => {
+  closeModal('guestModal');
+  $('joinScreen').classList.remove('hidden'); // rạp vẫn chạy phía sau
+  showAuth('signup');
+  syncGuestUi();
+};
+$('authBack').onclick = () => { $('joinScreen').classList.add('hidden'); };
+
 $('logoutBtn').onclick = async () => {
   await api('/api/auth/logout', {});
   state.account = null;
+  state.guest = false;
+  syncGuestUi();
   state.everJoined = false;
   state.joined = false;
   showJoinScreen();
@@ -370,10 +432,15 @@ async function join(auto = false, target = null) {
   $('joinBtn').disabled = true;
   $('joinMsg').textContent = '';
   const want = target || { room: state.roomId, password: state.roomPass };
-  const res = await net.request('join', { room: want.room || undefined, password: want.password || undefined });
+  const res = await net.request('join', { room: want.room || undefined, password: want.password || undefined, guest: !state.account && state.guest ? true : undefined });
   $('joinBtn').disabled = false;
   if (!res || !res.ok) {
-    if (res?.needLogin) { state.account = null; showJoinScreen(); $('authMsg').textContent = 'Phiên đăng nhập đã hết, bạn đăng nhập lại nhé.'; return res; }
+    if (res?.needLogin) {
+      const wasGuest = state.guest;
+      state.account = null; state.guest = false; syncGuestUi(); showJoinScreen();
+      $('authMsg').textContent = wasGuest ? (res.error || 'Chưa vào xem thử được, bạn tạo tài khoản nhé.') : 'Phiên đăng nhập đã hết, bạn đăng nhập lại nhé.';
+      return res;
+    }
     if (target) return res; // nơi gọi tự báo lỗi (sai mật khẩu, phòng đã đóng...)
     if (state.roomId && (res?.roomGone || res?.needPassword)) {
       // kết nối lại mà phòng riêng đã đóng / đổi mật khẩu: về sảnh chính
@@ -402,6 +469,7 @@ async function join(auto = false, target = null) {
   state.me = res.me;
   state.token = res.token;
   if (res.account) state.account = res.account;
+  syncGuestUi();
   if (res.events) { state.reminded = new Set(res.events.filter((e) => e.reminded).map((e) => e.id)); setEvents(res.events); }
   if (res.engage) setEngage(res.engage);
   state.isHost = !!res.isHost;
@@ -419,7 +487,7 @@ async function join(auto = false, target = null) {
   if (!auto) theater.walkIn(res.me.id); // thấy nhân vật của mình đi từ cửa vào ghế
   setViewButtons('overview');
   player.unlock();
-  setTimeout(() => $('hint').classList.add('fade'), 12000);
+  showHintOnce();
   // mỗi ngày tự mở bảng điểm danh 1 lần nếu chưa điểm danh
   if (!auto && state.engage && !state.engage.checkin.done && store.get('ciPrompt', '') !== vnDayKey()) {
     store.set('ciPrompt', vnDayKey());
@@ -430,7 +498,8 @@ async function join(auto = false, target = null) {
   } else if (!auto) {
     const portrait = window.innerWidth < window.innerHeight && window.innerWidth <= 860;
     const seat = seatInfo(res.me.seat);
-    toast(portrait ? '📱 Xoay ngang điện thoại để xem rõ hơn nhé!' : `Chào ${res.me.name}! Bạn ngồi ghế ${seat.code} · ${seat.type}. Bấm ghế khác để đổi chỗ 🍿`, 5000);
+    if (state.guest) toast(`👀 Bạn đang xem thử với tên ${res.me.name}. Thả emoji thoải mái nhé!`, 4500);
+    else toast(portrait ? '📱 Xoay ngang điện thoại để xem rõ hơn nhé!' : `Chào ${res.me.name}! Bạn ngồi ghế ${seat.code} · ${seat.type}. Bấm ghế khác để đổi chỗ 🍿`, portrait ? 4000 : 5000);
   }
   // vào bằng link phòng riêng (?phong=MÃ)
   if (pendingRoom && !target) {
@@ -446,6 +515,19 @@ async function join(auto = false, target = null) {
   return res;
 }
 $('joinBtn').onclick = () => join();
+
+// Mẹo dùng rạp: chỉ hiện 3 lần đầu, bấm ✕ là tắt hẳn
+function showHintOnce() {
+  const seen = store.get('hintSeen', 0);
+  if (seen >= 3 || state.hintShown) return;
+  state.hintShown = true;
+  store.set('hintSeen', seen + 1);
+  const touch = matchMedia('(hover: none)').matches;
+  if (touch) $('hintText').textContent = '💡 Chạm ghế trống để đổi chỗ · Chạm vào bạn bè để ném bỏng ngô · Vuốt để nhìn quanh · Chụm 2 ngón để phóng to';
+  $('hint').classList.remove('hidden', 'fade');
+  setTimeout(() => $('hint').classList.add('fade'), 15000);
+}
+$('hintClose').onclick = () => { store.set('hintSeen', 99); $('hint').classList.add('hidden'); };
 
 // ---------------- TỦ ĐỒ ----------------
 const wd = { draft: null, tab: 'look', preview: null };
@@ -638,7 +720,7 @@ function renderViewers() {
   const text = `👥 ${all.length}/100 ghế`;
   $('viewers').textContent = text;
   const cur = state.current;
-  $('joinNow').textContent = (cur ? `🎬 Đang chiếu: ${cur.title}` : state.voting ? '🗳️ Đang bình chọn video tiếp theo' : '🎬 Chưa có phim nào đang chiếu')
+  $('joinNow').textContent = (cur ? `🎬 Đang chiếu: ${cur.title}` : state.voting ? '🗳️ Đang bình chọn video tiếp theo' : state.housePlaylist ? '🍿 Rạp đang mở cửa, vào là có phim chiếu ngay' : '🎬 Chưa có phim nào đang chiếu')
     + ` · ${text.replace('👥 ', '')}`;
   if (state.drawer === 'chat') $('drawerEyebrow').textContent = `${humansCount()} NGƯỜI ĐANG Ở ĐÂY`;
   if (!$('seatModal').classList.contains('hidden')) renderSeatMap();
@@ -649,7 +731,7 @@ function renderSeatChip() {
   if (!me) return;
   const s = seatInfo(me.seat);
   $('seatChip').textContent = `💺 ${s.code} · ${s.type}` + (me.stage ? ' · 🎤 trên sân khấu' : typeof onSofaWithFriends === 'function' && onSofaWithFriends() ? ' · 💞 ngồi cùng bạn' : '');
-  $('dockSeatLabel').textContent = s.code;
+  $('dockSeatLabel').textContent = `Đổi ghế · ${s.code}`;
   $('dockSeatLabel').parentElement.title = `Bạn đang ở ${s.code} · ${s.type} — bấm để đổi chỗ`;
   $('stageBtn').classList.toggle('live', !!me.stage);
   $('stageBtn').querySelector('span').textContent = me.stage ? 'Xuống sân khấu' : 'Lên sân khấu';
@@ -664,6 +746,11 @@ function renderParty() {
   tag.classList.toggle('hidden', !(cur && cur.energetic));
   if (cur && cur.energetic) {
     tag.querySelector('span').textContent = state.prefs.lasers ? `Disco · ${cur.bpm || 128} BPM` : 'Đã tắt hiệu ứng trên máy bạn';
+    // lần đầu gặp video có đèn chớp trong phiên: nhắc cách tắt (an toàn cho người nhạy cảm ánh sáng)
+    if (state.prefs.lasers && state.joined && !state.flashWarned) {
+      state.flashWarned = true;
+      toast('⚡ Video này có đèn chớp nhấp nháy theo nhạc. Nếu bạn nhạy cảm với ánh sáng nhấp nháy, bấm nút ⚡ ở góc dưới bên phải để tắt.', 9000);
+    }
   }
 }
 
@@ -1046,6 +1133,17 @@ $('emojiClose').onclick = closeEmojiPanel;
 function buildEmojiBar() {
   const bar = $('emojiBar');
   bar.innerHTML = '';
+  // hàng emoji "thả bay lên" trong bảng emoji (điện thoại: thay cho thanh thả cảm xúc)
+  const pe = $('panelEmojis');
+  pe.innerHTML = '';
+  state.quickEmojis.forEach((em) => {
+    const b = document.createElement('button');
+    b.type = 'button';
+    b.textContent = em;
+    b.title = `Thả ${em} bay lên`;
+    b.onclick = () => net.send('emoji', em);
+    pe.appendChild(b);
+  });
   state.quickEmojis.forEach((em, i) => {
     const b = document.createElement('button');
     b.textContent = em;
@@ -1072,6 +1170,16 @@ document.addEventListener('click', (e) => {
 $('emoteBtn').onclick = () => togglePopover('emoteMenu');
 document.querySelectorAll('[data-emote]').forEach((b) => {
   b.onclick = () => { net.send('emote', b.dataset.emote); togglePopover('emoteMenu'); };
+});
+
+document.querySelectorAll('[data-pact]').forEach((b) => {
+  b.onclick = () => {
+    const a = b.dataset.pact;
+    if (a === 'dance' || a === 'wave' || a === 'clap') net.send('emote', a);
+    else if (a === 'stage') { closeEmojiPanel(); $('stageBtn').click(); }
+    else if (a === 'popcorn') $('popcornBtn').click();
+    else $(a === 'tomato' ? 'tomatoBtn' : 'roseBtn').click();
+  };
 });
 
 $('stageBtn').onclick = async () => {
@@ -1286,6 +1394,7 @@ document.addEventListener('keydown', (e) => {
 // ---------------- THANH MENU BÊN PHẢI + NGĂN TRƯỢT ----------------
 function syncDock() {
   document.querySelectorAll('#dock [data-act]').forEach((b) => b.classList.toggle('active', b.dataset.act === state.drawer));
+  $('dockMore').classList.toggle('active', !!$('dockMoreMenu').querySelector('.active'));
   document.body.classList.toggle('focus-chat', !!state.focus && state.drawer === 'chat');
   $('focusChat').classList.toggle('active', state.drawer === 'chat');
 }
@@ -1308,10 +1417,28 @@ function openDrawer(view) {
 function closeDrawer() {
   state.drawer = null;
   $('drawer').classList.add('hidden');
+  $('drawer').classList.remove('tall');
   document.body.classList.remove('drawer-open');
   syncDock();
 }
 $('drawerClose').onclick = closeDrawer;
+// Điện thoại: ngăn là "tấm kéo" nửa màn hình. Kéo lên = cao hơn, kéo xuống = thấp lại / đóng.
+(function drawerSheet() {
+  const grip = $('drawerGrip');
+  let y0 = null;
+  const setTall = (t) => $('drawer').classList.toggle('tall', t);
+  grip.addEventListener('pointerdown', (e) => { y0 = e.clientY; try { grip.setPointerCapture(e.pointerId); } catch { /* bỏ qua */ } });
+  grip.addEventListener('pointerup', (e) => {
+    if (y0 === null) return;
+    const dy = e.clientY - y0;
+    y0 = null;
+    const tall = $('drawer').classList.contains('tall');
+    if (Math.abs(dy) < 12) return setTall(!tall);   // chạm: đổi cao / thấp
+    if (dy < -30) setTall(true);
+    else if (dy > 30) { if (tall) setTall(false); else closeDrawer(); }
+  });
+  grip.addEventListener('pointercancel', () => { y0 = null; });
+})();
 $('queueAdd').onclick = () => openVideoModal();
 
 function setDockCollapsed(c) {
@@ -1334,8 +1461,18 @@ const DOCK_ACTIONS = {
   host: () => (state.drawer === 'host' ? closeDrawer() : openHost()),
   friends: () => (state.drawer === 'friends' ? closeDrawer() : openFriends()),
   support: () => openSupport(),
+  rooms: () => openRooms(),
 };
-document.querySelectorAll('#dock [data-act]').forEach((b) => { b.onclick = () => DOCK_ACTIONS[b.dataset.act](); });
+document.querySelectorAll('#dock [data-act]').forEach((b) => {
+  b.onclick = () => {
+    if (b.closest('#dockMoreMenu')) { $('dockMoreMenu').classList.add('hidden'); $('dockMore').setAttribute('aria-expanded', 'false'); }
+    DOCK_ACTIONS[b.dataset.act]();
+  };
+});
+$('dockMore').onclick = () => {
+  togglePopover('dockMoreMenu');
+  $('dockMore').setAttribute('aria-expanded', String(!$('dockMoreMenu').classList.contains('hidden')));
+};
 // nút ngoài menu phải: Phòng riêng (góc dưới trái), Nhiệm vụ + Xếp hạng (góc trên phải)
 $('roomsBtn').onclick = () => openRooms();
 $('missionBtn').onclick = () => openActivity('daily');
@@ -2739,6 +2876,8 @@ net.on('hello', async (d) => {
   if (d.gifts) state.gifts = d.gifts;
   if (d.rooms) state.rooms = d.rooms;
   if (d.invite) state.inviteCfg = d.invite;
+  state.housePlaylist = !!d.housePlaylist;
+  $('authBox').classList.toggle('no-guest', d.guestMode === false);
   if ('poll' in d) state.poll = d.poll;
   if (d.characters && d.characters.join() !== state.characters.join()) {
     state.characters = d.characters.filter((c) => CHARACTER_INFO[c]);
@@ -2754,7 +2893,7 @@ net.on('hello', async (d) => {
   applyState(d.state);
   $('joinBtn').disabled = false;
   syncClock();
-  if (state.account && (state.everJoined || state.pendingJoin)) {
+  if ((state.account || state.guest) && (state.everJoined || state.pendingJoin)) {
     // rớt mạng rồi kết nối lại (hoặc bấm "vào lại"): tự vào lại rạp
     state.pendingJoin = false;
     if (wasJoined || state.everJoined) toast('Đã kết nối lại ✅');
